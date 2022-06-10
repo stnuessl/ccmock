@@ -1,0 +1,8 @@
+[
+    {
+        "directory": "/home/bockler/Projects/ccmock/test/system-tests",
+        "file": "simple.c",
+        "output": "simple.o",
+        "arguments": ["clang", "-c", "-o", "simple.o", "-std=c11", "simple.c"]
+    }
+]

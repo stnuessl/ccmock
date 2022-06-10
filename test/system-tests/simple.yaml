@@ -1,0 +1,12 @@
+
+
+---
+Blacklist:
+  - printf
+  - fprintf
+
+MockStandardLibrary: Yes
+UseColor: auto
+PrintTimestamp: yes
+Output: simple-test.inc
+...
