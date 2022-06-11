@@ -69,7 +69,19 @@ void GMockGenerator::HandleTranslationUnit(clang::ASTContext &Context)
     writeFileHeader(Context);
     generateGlobalMocks(CFuncDecls);
 
-    dumpMocks(llvm::outs());
+    if (!Config_->Output.empty()) {
+        std::error_code error;
+        auto OS = llvm::raw_fd_stream(Config_->Output, error);
+        if (error) {
+            llvm::errs() << util::cl::Error() 
+                         << "failed to open \"" << Config_->Output
+                         << "\": " << error.message() << "\n";
+            std::exit(EXIT_FAILURE);
+        }
+        dumpMocks(OS);
+    } else {
+        dumpMocks(llvm::outs());
+    }
 }
 
 void GMockGenerator::dumpMocks(llvm::raw_ostream &os)

@@ -216,8 +216,11 @@ __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
     if (Quiet.getNumOccurrences() != 0)
         Config->Quiet = Quiet;
 
+    if (!OutputFile.empty())
+        Config->Output = std::move(OutputFile);
+
     if (DumpConfig) {
-        if (!OutputFile.empty())
+        if (!Config->Output.empty())
             Config->write(OutputFile);
         else
             Config->write(llvm::outs());
