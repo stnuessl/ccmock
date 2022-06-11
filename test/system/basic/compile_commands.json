@@ -1,0 +1,8 @@
+[
+    {
+        "directory": "/home/bockler/Projects/ccmock/test/system/basic",
+        "file": "src/fac.c",
+        "output": "src/fac.o",
+        "arguments": ["clang", "-c", "-o", "src/fac.o", "-std=c11", "-I", "src", "src/fac.c"]
+    }
+]

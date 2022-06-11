@@ -1,4 +1,3 @@
-#!/usr/bin/bash env
 #
 # The MIT License (MIT)
 #
@@ -23,38 +22,46 @@
 # THE SOFTWARE.
 #
 
+SHELL	:= bash -o pipefail
+CC		:= clang
+CXX		:= clang
 
-set -e
+src		:= $(shell find src -name "*.c")
+obj		:= $(patsubst %.c,%.o,$(src))
+ut_src	:= $(shell find test -name "*.cpp")
+ut_obj	:= $(patsubst %.cpp,%.o,$(ut_src))
+ut_gen	:= $(patsubst src/%.c,test/%.inc,$(src))
+ut_bin	:= $(patsubst %.cpp,%.elf,$(ut_src))
+ut_out	:= $(patsubst %.cpp,%.txt,$(ut_src))
 
-./build/release/ccmock \
-    --compile-commands=test/system-tests/compile-commands.json \
-    --config=test/system-tests/simple.yaml \
-    test/system-tests/simple.c \
-    > test/system-tests/simple-test.inc
+CPPFLAGS	:= $(shell pkg-config --cflags gmock gtest)
+CFLAGS		:=
+CXXFLAGS	:= -std=c++11 -fno-rtti
+LDFLAGS		:= -lstdc++ $(shell pkg-config --libs gmock gtest)
 
+#
+# Disable all implicit rules
+#
+.SUFFIXES:
 
-clang \
-    -c \
-    $(pkg-config --cflags gmock gtest) \
-    -fno-rtti \
-    -o test/system-tests/simple-test.o \
-    test/system-tests/simple-test.cpp
+all: tests
 
-clang \
-    -c \
-    -o test/system-tests/simple.o \
-    test/system-tests/simple.c
+tests: $(ut_out)
 
-clang \
-    -lstdc++ \
-    $(pkg-config --libs gmock gtest) \
-    test/system-tests/simple.o \
-    test/system-tests/simple-test.o \
-    -o test/system-tests/simple.elf
+%.txt: %.elf
+	./$< | tee $@
 
-test/system-tests/simple.elf
+test/%.elf: test/%.o src/%.o
+	$(CC) -o $@ $(CXXFLAGS) $(LDFLAGS) $^
 
-rm -f test/system-tests/simple-test.inc \
-    test/system-tests/simple-test.o \
-    test/system-tests/simple.o \
-    test/system-tests/simple.elf
+src/%.o: src/%.c
+	$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $<
+
+test/%.o: test/%.cpp test/%.inc
+	$(CXX) -c -o $@ -Isrc $(CPPFLAGS) $(CXXFLAGS) $<
+
+test/%.inc: src/%.c
+	./../../../build/release/ccmock -o $@ --config=test/ccmock.yaml $<
+
+clean:
+	rm -f $(obj) $(ut_obj) $(ut_bin) $(ut_out) $(ut_gen)

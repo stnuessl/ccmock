@@ -15,9 +15,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SIMPLE_H_
-#define SIMPLE_H_
+#include "fac.h"
 
-int fac(int n);
+int mul(int x, int y);
 
-#endif /* SIMPLE_H_ */
+int fac(int n)
+{
+    if (n < 2)
+        return 1;
+
+    return mul(n, fac(n - 1));
+}

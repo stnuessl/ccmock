@@ -15,12 +15,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-int mul(int x, int y);
+#ifndef FAC_H_ 
+#define FAC_H_
 
-int fac(int n)
-{
-    if (n < 2)
-        return 1;
+int fac(int n);
 
-    return mul(n, fac(n - 1));
-}
+#endif /* FAC_H_ */

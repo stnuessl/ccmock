@@ -20,13 +20,13 @@
 extern "C" {
 #endif
 
-#include "simple.h"
+#include "fac.h"
 
 #ifdef __cplusplus
 }
 #endif
 
-#include "simple-test.inc"
+#include "fac.inc"
 
 TEST(fac, basic)
 {
