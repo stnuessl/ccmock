@@ -25,6 +25,7 @@
 SHELL	:= bash -o pipefail
 CC		:= clang
 CXX		:= clang
+LD		:= clang
 
 src		:= $(shell find src -name "*.c")
 obj		:= $(patsubst %.c,%.o,$(src))
@@ -37,12 +38,19 @@ ut_out	:= $(patsubst %.cpp,%.txt,$(ut_src))
 CPPFLAGS	:= $(shell pkg-config --cflags gmock gtest)
 CFLAGS		:=
 CXXFLAGS	:= -std=c++11 -fno-rtti
-LDFLAGS		:= -lstdc++ $(shell pkg-config --libs gmock gtest)
+LDLIBS		:= -lstdc++ $(shell pkg-config --libs gmock gtest)
 
 #
 # Disable all implicit rules
 #
 .SUFFIXES:
+
+#
+# Prevent make from automatically removing
+# intermediate files when invoking "all".
+#
+.SECONDARY:
+
 
 all: tests
 
@@ -52,7 +60,7 @@ tests: $(ut_out)
 	./$< | tee $@
 
 test/%.elf: test/%.o src/%.o
-	$(CC) -o $@ $(CXXFLAGS) $(LDFLAGS) $^
+	$(LD) -o $@ $(CXXFLAGS) $(LDFLAGS) $(LDLIBS) $^
 
 src/%.o: src/%.c
 	$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $<
@@ -65,3 +73,10 @@ test/%.inc: src/%.c
 
 clean:
 	rm -f $(obj) $(ut_obj) $(ut_bin) $(ut_out) $(ut_gen)
+
+.PHONY: \
+	all \
+	tests \
+	clean
+
+

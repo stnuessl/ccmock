@@ -28,12 +28,22 @@ extern "C" {
 
 #include "fac.inc"
 
+
 TEST(fac, basic)
 {
+    ASSERT_EQ(1, fac(0));
+    ASSERT_EQ(1, fac(1));
+
     EXPECT_CALL(mock, mul(testing::_, testing::_))
-        .WillOnce(testing::Return(2))
-        .WillOnce(testing::Return(6));
+        .Times(testing::Exactly(2))
+        .WillRepeatedly(testing::Invoke([](int a, int b) { return a * b; }));
 
     ASSERT_EQ(6, fac(3));
+
+    EXPECT_CALL(mock, mul(testing::_, testing::_))
+        .Times(testing::Exactly(3))
+        .WillRepeatedly(testing::Invoke([](int a, int b) { return a * b; }));
+
+    ASSERT_EQ(24, fac(4));
 }
 
