@@ -25,7 +25,7 @@
 SHELL := bash -o pipefail
 CC := clang
 CXX := clang++
-LD := $(CC)
+LD := clang
 TAR := tar
 PKGCONF := pkg-config
 
@@ -649,7 +649,8 @@ $(ut_bindir)/%.txt: $(ut_bindir)/%.elf
 	@printf "$(magenta)Executing [ $< ]$(reset)\n"
 	$(Q)./$< | tee $@ || (rm -f $@ && false)
 
-$(ut_bindir)/%.elf: $(ut_bindir)/%.$(OBJ_SUFFIX) $(ut_dir)/$(srcdir)/%.$(OBJ_SUFFIX)
+$(ut_bindir)/%.elf: \
+	$(ut_bindir)/%.$(OBJ_SUFFIX) $(ut_dir)/$(srcdir)/%.$(OBJ_SUFFIX)
 	@printf "$(yellow)Linking [ $@ ]$(reset)\n"
 	$(Q)gcc -o $@ $^ $(LDFLAGS) $(LDLIBS)
 

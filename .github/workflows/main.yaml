@@ -1,0 +1,45 @@
+#
+# Github workflow 
+#
+
+name: CI 
+on: 
+  pull_request:
+    branches:
+      - master
+      - dev
+  push:
+    branches:
+      - master
+      - dev
+  workflow_dispatch:
+  schedule:
+    - cron: "0 2 * * 6"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: [clang, gcc]
+        docker_image: [archlinux-build]
+    env:
+      ARTIFACTORY_API_KEY: ${{ secrets.ARTIFACTORY_API_KEY }}
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      CMD: |
+        make \
+          GITHUB_REF=${GITHUB_REF} \
+          GITHUB_RUN_ID=${GITHUB_RUN_ID} \
+          GITHUB_SHA=${GITHUB_SHA} \
+          GITHUB_JOB=${GITHUB_JOB} \
+          CXX=${{ matrix.compiler }} \
+          LD=${{ matrix.compiler }} \
+          EXTRA_CFLAGS=-Werror \
+          artifactory-upload
+    if: true 
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Create and run docker image
+        run: make -f docker/Makefile ${{ matrix.docker_image }}
+
