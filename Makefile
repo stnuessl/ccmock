@@ -25,6 +25,7 @@
 SHELL := bash -o pipefail
 CC := clang
 CXX := clang++
+LD := $(CC)
 TAR := tar
 PKGCONF := pkg-config
 
@@ -38,7 +39,7 @@ Q :=
 #
 # Set name of the binary
 #
-BIN := ccmock 
+BIN := ccmock
 
 #
 # Set object and dependency file suffixes
@@ -113,9 +114,7 @@ artifactory_upload_url := \
 	;job=$(GITHUB_JOB)$\
 	;os=$(os_name)$\
 	;version=$(version_core)$\
-	;xdg_session_type=$(XDG_SESSION_TYPE)$\
 	/$(os_name)$\
-	/$(XDG_SESSION_TYPE)$\
 	/$(notdir $(CC))$\
 	/$(date)$\
 	/$(time)
@@ -145,7 +144,13 @@ endif
 # Define variable which can be used to check if the clang compiler
 # family is used for this invocation of make.
 #
-clang_used := $(findstring clang,$(CC))
+
+gcc_ld		:= $(shell echo "$(LD)" | grep "g\(cc\|\++\)")
+clang_ld	:= $(shell echo "$(LD)" | grep "clang")
+gcc_cc		:= $(shell echo "$(CC)" | grep "g\(cc\|\++\)")
+clang_cc	:= $(shell echo "$(CC)" | grep "clang")
+gcc_cxx		:= $(shell echo "$(CXX)" | grep -i "g\(cc\|\++\)")
+clang_cxx	:= $(shell echo "$(CXX)" | grep -i "clang")
 
 #
 # Uncomment if 'VPATH' is needed. 'VPATH' is a list of directories in which
@@ -232,7 +237,8 @@ version_list := \
 	"$$(curl --version)" \
 	"$$($(TAR) --version)" \
 	"$$(column --version)" \
-	"$$(sed --version)"
+	"$$(sed --version)" \
+	"llvm $$(llvm-config --version)"
 
 #
 # Variables for the clang analyzer
@@ -250,13 +256,13 @@ analyzer_flags = \
 	-Xclang -analyzer-config -Xclang display-ctu-progress=true \
 	$(DEFS) \
 	$(INC) \
-	$(CFLAGS)
+	$(CXXFLAGS)
 
 analyzer_defmap := $(analyzer_dir)/externalDefMap.txt
 analyzer_output := $(BUILD_DIR)/clang-analysis
 
 dirs += $(analyzer_dir) $(sort $(dir $(analyzer_files)))
-ifndef clang_used
+ifndef clang_cxx
 version_list += "$$($(ANALYZER) --version)"
 endif
 endif
@@ -347,6 +353,7 @@ pkgconf_libs := \
 # Set non-pkg-configurable libraries flags 
 #
 LDLIBS := \
+	-lstdc++ \
 	$(shell llvm-config --libs) \
 	-lclang-cpp \
 #	-Wl,--start-group \
@@ -452,14 +459,14 @@ LDFLAGS		+= $(EXTRA_LDFLAGS)
 #
 ifeq (,$(shell $(PKGCONF) --print-errors --exists gtest gmock 2>&1))
 ut_target	:= unit-tests
-ut_srcdir	:= test/unit-tests
+ut_srcdir	:= test/unit
 ut_dir		:= $(BUILD_DIR)/unit-tests
 ut_bindir	:= $(ut_dir)/tests
 ut_src		:= $(shell find $(ut_srcdir) -name "*.cpp" -printf "%P\n")
 
 ut_objs := \
 	$(patsubst %.cpp,$(ut_bindir)/%.$(OBJ_SUFFIX),$(ut_src)) \
-	$(patsubst %.c,$(ut_dir)/%.$(OBJ_SUFFIX),$(reg_src_c))
+	$(patsubst %.cpp,$(ut_dir)/%.$(OBJ_SUFFIX),$(reg_src_cxx))
 
 #
 # Every unit test source file has its own executable and report file.
@@ -475,7 +482,7 @@ dirs += \
 version_list += "gtest $$($(PKGCONF) --modversion gtest)"
 version_list += "gmock $$($(PKGCONF) --modversion gmock)"
 
-ifdef clang_used
+ifdef clang_cxx
 version_list += "$$(gcc --version)"
 endif
 
@@ -483,8 +490,7 @@ $(ut_tests): CPPFLAGS	+= -DUNIT_TESTS_ENABLED -DMEM_NOLEAK -I$(srcdir)
 $(ut_tests): CPPFLAGS	+= $(shell $(PKGCONF) --libs gtest gmock)
 $(ut_tests): CFLAGS		+= -Og -g2 -ftest-coverage -fprofile-arcs
 $(ut_tests): CXXFLAGS	+= -Og -g2 -ftest-coverage -fprofile-arcs
-$(ut_tests): LDFLAGS	:=
-$(ut_tests): LDLIBS		:= -lstdc++ $(shell $(PKGCONF) --libs gtest gmock)
+$(ut_tests): LDLIBS		+= $(shell $(PKGCONF) --libs gtest gmock)
 
 ifneq (,$(shell type -fP lcov))
 ut_info := $(ut_dir)/$(BIN).info
@@ -515,6 +521,11 @@ reset		:= \e[0m
 
 endif
 
+#
+# Disable all implicit rules to minimize confusion about which
+# rule applies to which files.
+#
+.SUFFIXES:
 
 all: release tags 
 release: $(release_bin) $(release_cmds)
@@ -526,9 +537,15 @@ debug: $(debug_bin) $(debug_cmds)
 #
 
 $(release_bin): CPPFLAGS	+= -DNDEBUG
-$(release_bin): CFLAGS		+= -O2 -flto -fdata-sections -ffunction-sections
-$(release_bin): CXXFLAGS	+= -O2 -flto -fdata-sections -ffunction-sections
-$(release_bin): LDFLAGS		+= -O2 -flto -Wl,--gc-sections
+$(release_bin): CFLAGS		+= -flto -O2 -fdata-sections -ffunction-sections
+$(release_bin): CXXFLAGS	+= -flto -O2 -fdata-sections -ffunction-sections
+$(release_bin): LDFLAGS		+= -Wl,--gc-sections -O2
+
+ifdef clang_ld
+$(release_bin): LDFLAGS		+= -flto -flto-jobs=0
+else ifdef gcc_ld
+$(release_bin): LDFLAGS		+= -flto=auto
+endif
 
 $(debug_bin): CFLAGS		+= -Og -g2
 $(debug_bin): CXXFLAGS		+= -Og -g2
@@ -539,14 +556,14 @@ syntax-check: $(debug_objs)
 
 $(release_bin): $(release_objs)
 	@printf "$(yellow)Linking [ $@ ]$(reset)\n"
-	$(Q)$(CXX) -o $@ $^ $(LDFLAGS) $(LDLIBS)
+	$(Q)$(LD) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 	$(Q)strip --strip-all $@
 	@printf "$(green)Built target [ $@ ]$(reset)\n"
 	@sha256sum --tag $@
 
 $(debug_bin): $(debug_objs)
 	@printf "$(yellow)Linking [ $@ ]$(reset)\n"
-	$(Q)$(CXX) -o $@ $^ $(LDFLAGS) $(LDLIBS)
+	$(Q)$(LD) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 	@printf "$(green)Built target [ $@ ]$(reset)\n"
 	@sha256sum --tag $@
 
@@ -554,7 +571,7 @@ $(debug_bin): $(debug_objs)
 
 $(release_dir)/%.$(OBJ_SUFFIX): %.cpp
 	@printf "$(blue)Building [ $@ ]$(reset)\n"
-ifdef clang_used
+ifdef clang_cxx
 	$(Q)$(CXX) -c -o $@ -MJ $(release_dir)/$*.json $(CPPFLAGS) $(CXXFLAGS) $<
 else
 	$(Q)$(CXX) -c -o $@ $(CPPFLAGS) $(CXXFLAGS) $<
@@ -573,7 +590,7 @@ endif
 
 $(debug_dir)/%.$(OBJ_SUFFIX): %.cpp
 	@printf "$(blue)Building [ $@ ]$(reset)\n"
-ifdef clang_used
+ifdef clang_cxx
 	$(Q)$(CXX) -c -o $@ -MJ $(debug_dir)/$*.json $(CPPFLAGS) $(CXXFLAGS) $<
 else
 	$(Q)$(CXX) -c -o $@ $(CPPFLAGS) $(CXXFLAGS) $<
