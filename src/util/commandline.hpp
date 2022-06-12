@@ -23,22 +23,22 @@
 namespace util {
 namespace cl {
 
-struct Info {
+struct info {
 public:
     friend inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
-                                                const Info Item);
+                                                const info Item);
 };
 
-struct Warning {
+struct warning {
 public:
     friend inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
-                                                const Warning Item);
+                                                const warning Item);
 };
 
-struct Error {
+struct error {
 public:
     friend inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
-                                                const Error Item);
+                                                const error Item);
 };
 
 static inline llvm::raw_ostream &write(llvm::raw_ostream &OS,
@@ -52,21 +52,21 @@ static inline llvm::raw_ostream &write(llvm::raw_ostream &OS,
     return OS;
 }
 
-inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Info X)
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const info X)
 {
     (void) X;
 
-    return write(OS, llvm::raw_ostream::GREEN, "info: ");
+    return write(OS, llvm::raw_ostream::MAGENTA, "info: ");
 }
 
-inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Warning X)
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const warning X)
 {
     (void) X;
 
     return write(OS, llvm::raw_ostream::MAGENTA, "warning: ");
 }
 
-inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Error X)
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const error X)
 {
     (void) X;
 

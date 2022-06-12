@@ -68,6 +68,7 @@ void ASTVisitor::dispatch(const clang::FunctionDecl *FunctionDecl)
     if (FunctionDecl->hasBody())
         return;
 
+    /* TODO: remove inefficience due to *AsString() */
     if (Blacklist_.count(FunctionDecl->getQualifiedNameAsString())) {
         llvm::errs() << "Ignoring: " << *FunctionDecl << "\n";
         return;
@@ -87,8 +88,17 @@ void ASTVisitor::dispatch(const clang::FunctionDecl *FunctionDecl)
     auto [it, ok] = FunctionDeclMap_.insert({ID, FunctionDecl});
     if (!ok) {
         FunctionDecl->printQualifiedName(llvm::errs());
-        llvm::errs() << ": " << util::cl::Warning()
-                     << "failed to mark for further processing\n";
+        llvm::errs() << ": ";
+
+        if (Config_->Strict)
+            llvm::errs() << util::cl::error();
+        else
+            llvm::errs() << util::cl::warning();
+
+        llvm::errs() << "failed to mark function for further processing\n";
+
+        if (Config_->Strict)
+            std::exit(EXIT_FAILURE);
     }
 }
 
@@ -103,7 +113,7 @@ void ASTVisitor::doVisitCallExpr(const clang::CallExpr *CallExpr)
 
     if (Config_->MockStandardLibrary) {
         if (SourceManager_->isInSystemHeader(FunctionDecl->getLocation()))
-            llvm::errs() << util::cl::Info()
+            llvm::errs() << util::cl::info()
                          << *FunctionDecl << ": is Systemheader\n";
     }
 

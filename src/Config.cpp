@@ -39,8 +39,9 @@ public:
         IO.mapOptional("UseColor", Config.UseColor);
         IO.mapOptional("ClangResourceDirectory", Config.ClangResourceDirectory);
         IO.mapOptional("MockStandardLibrary", Config.MockStandardLibrary);
-        IO.mapOptional("MockType", Config.MockType, "StrictMock");
+        IO.mapOptional("MockType", Config.MockType);
         IO.mapOptional("Output", Config.Output);
+        IO.mapOptional("Strict", Config.Strict);
         IO.mapOptional("PrintTimestamp", Config.PrintTimestamp);
         IO.mapOptional("PrintMainFunction", Config.PrintMainFunction);
         IO.mapOptional("Verbose", Config.Verbose);
@@ -52,10 +53,8 @@ public:
     {
         (void) IO;
 
-//        if (Config.MockType == "") {
-//            Config.MockType = "StrictMock";
-//            return "";
-//        }
+        if (Config.MockType.empty())
+            return "";
 
         if (Config.MockType == "NaggyMock")
             return "";
@@ -77,8 +76,8 @@ void Config::read(llvm::StringRef Path)
 {
     auto MemBuffer = llvm::MemoryBuffer::getFile(Path);
     if (!MemBuffer) {
-        /* TODO: */
-        llvm::errs() << "failed to open file \"" << Path << "\" - "
+        llvm::errs() << util::cl::error()
+                     << "failed to open \"" << Path << "\": "
                      << MemBuffer.getError().message() << "\n";
         std::exit(EXIT_FAILURE);
     }
@@ -87,8 +86,8 @@ void Config::read(llvm::StringRef Path)
     Input >> *this;
 
     if (Input.error()) {
-        /* TODO: */
-        llvm::errs() << "failed to parse file \"" << Path << "\".\n";
+        llvm::errs() << util::cl::error()
+                     << "failed to parse \"" << Path << "\".\n";
         std::exit(EXIT_FAILURE);
     }
 }
@@ -100,7 +99,7 @@ void Config::write(llvm::StringRef Path)
     llvm::raw_fd_ostream OS(Path, Error);
 
     if (Error) {
-        llvm::errs() << util::cl::Error()
+        llvm::errs() << util::cl::error()
                      << "failed to open \"" << Path << "\": "
                      << Error.message() << "\n";
         std::exit(EXIT_FAILURE);

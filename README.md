@@ -35,9 +35,9 @@ function mocks for C and C++ projects using Google's
 ### Configuration Precedence Order
 
 1. Command-line arguments
-1. Environment variables
-1. File-specific configuration file
-1. Project-specific configuration file
+1. Configuration file specified by an environment variable
+1. 1st configuration file specified by a command-line argument
+1. 2st configuration file specified by a command-line argument
 
 
 ### Examples

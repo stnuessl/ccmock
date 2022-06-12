@@ -46,6 +46,7 @@ public:
     std::string Output;
     bool MockStandardLibrary;
     bool PrintTimestamp;
+    bool Strict;
     bool Verbose;
     bool Force;
     bool Quiet;

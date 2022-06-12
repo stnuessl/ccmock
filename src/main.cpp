@@ -48,11 +48,13 @@
 
 static llvm::cl::OptionCategory ToolCategory("Tool Options");
 
-static llvm::cl::list<std::string> InputFiles(
-    llvm::cl::desc("[<file> ...]"),
+
+static llvm::cl::opt<std::string> InputFile(
+    llvm::cl::desc("<file>"),
+    llvm::cl::value_desc("file"),
+    llvm::cl::ValueRequired,
     llvm::cl::Positional,
-    llvm::cl::ZeroOrMore,
-    llvm::cl::PositionalEatsArgs,
+    llvm::cl::Optional,
     llvm::cl::cat(ToolCategory)
 );
 
@@ -68,7 +70,7 @@ static llvm::cl::opt<std::string> CompileCommandsFile(
     llvm::cl::cat(ToolCategory)
 );
 
-static llvm::cl::opt<std::string> ConfigFile(
+static llvm::cl::list<std::string> ConfigFile(
     "config",
     llvm::cl::desc(
         "Use file <file> as the local configuration when running ccmock.\n"
@@ -76,7 +78,8 @@ static llvm::cl::opt<std::string> ConfigFile(
         "parent directories of the current working directory.\n"
     ),
     llvm::cl::value_desc("file"),
-    llvm::cl::ValueOptional,
+    llvm::cl::ValueRequired,
+    llvm::cl::CommaSeparated,
     llvm::cl::cat(ToolCategory)
 );
 
@@ -99,11 +102,31 @@ static llvm::cl::opt<bool> Force(
     llvm::cl::cat(ToolCategory)
 );
 
+static llvm::cl::alias ForceAlias(
+    "f",
+    llvm::cl::desc("Same as --force"),
+    llvm::cl::aliasopt(Force),
+    llvm::cl::NotHidden
+);
+
 static llvm::cl::opt<bool> Verbose(
     "verbose",
     llvm::cl::desc(
         ""
     ),
+    llvm::cl::init(false),
+    llvm::cl::cat(ToolCategory)
+);
+
+static llvm::cl::alias VerboseAlias(
+    "v",
+    llvm::cl::desc("Same as --verbose"),
+    llvm::cl::aliasopt(Verbose)
+);
+
+static llvm::cl::opt<bool> Strict(
+    "strict",
+    llvm::cl::desc("Treat warnings as errors."),
     llvm::cl::init(false),
     llvm::cl::cat(ToolCategory)
 );
@@ -115,6 +138,13 @@ static llvm::cl::opt<bool> Quiet(
     ),
     llvm::cl::init(false),
     llvm::cl::cat(ToolCategory)
+);
+
+static llvm::cl::alias QuietAlias(
+    "q",
+    llvm::cl::desc("Same as --quiet"),
+    llvm::cl::aliasopt(Quiet),
+    llvm::cl::NotHidden
 );
 
 static llvm::cl::opt<std::string> OutputFile(
@@ -141,7 +171,7 @@ loadCompileCommands(llvm::StringRef Path, std::string &Message)
         auto Error = llvm::sys::fs::current_path(Buffer);
 
         if (Error) {
-            llvm::errs() << util::cl::Warning()
+            llvm::errs() << util::cl::warning()
                          << "failed to retrieve working directory: "
                          << Error.message() << "\n";
             Buffer = ".";
@@ -161,14 +191,12 @@ loadCompileCommands(llvm::StringRef Path, std::string &Message)
     if (Ext.equals(".txt"))
         return FixedCompilationDatabase::loadFromFile(Path, Message);
 
-    llvm::errs() << util::cl::Error()
-                 << "failed to load compile commands from \""
-                 << Path
+    llvm::errs() << util::cl::error()
+                 << "failed to load compile commands from \"" << Path
                  << "\": unsupported extension\n";
 
     std::exit(EXIT_FAILURE);
 }
-
 
 __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
 {
@@ -189,23 +217,36 @@ __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
                                                 nullptr,
                                                 true);
     if (!Ok) {
-        llvm::errs() << util::cl::Error()
+        llvm::errs() << util::cl::error()
                      << "failed to parse command-line arguments\n";
         std::exit(EXIT_FAILURE);
     }
 
-    /* Print help message if no command-line arguments were provided */
+    /*
+     * Print help message if no command-line arguments were provided.
+     * Looks like this can only be done after having invoked
+     * "llvm::cl::ParseCommandLineOptions".
+     */
     if (argc <= 1) {
         llvm::cl::PrintHelpMessage();
         std::exit(EXIT_SUCCESS);
     }
 
-    /* Read in and merge all configuration files */
+    /*
+     * Read in and merge all configuration files.
+     * Precedence order is from highest to lowest:
+     *      1. Command-line arguments
+     *      2. Configuration specified by environment variable
+     *      3. 1st Configuration
+     *      4. 2nd Configuration
+     *      ...
+     */
     auto Config = std::make_shared<::Config>();
-    if (ConfigFile.empty())
-        Config->read("ccmock.yaml");
-    else
-        Config->read(ConfigFile);
+    for (const auto &File : ConfigFile)
+        Config->read(File);
+
+    if (llvm::StringRef File = ::getenv("CCMOCK_CONFIG"); !File.empty())
+        Config->read(File);
 
     if (Verbose.getNumOccurrences() != 0)
         Config->Verbose = Verbose;
@@ -215,6 +256,9 @@ __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
 
     if (Quiet.getNumOccurrences() != 0)
         Config->Quiet = Quiet;
+
+    if (Strict.getNumOccurrences() != 0)
+        Config->Strict = Strict;
 
     if (!OutputFile.empty())
         Config->Output = std::move(OutputFile);
@@ -246,19 +290,18 @@ __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
 
     auto Commands = loadCompileCommands(CompileCommandsFile, Message);
     if (!Commands) {
-        llvm::errs() << util::cl::Error()
-                     << Message << "\n";
+        llvm::errs() << util::cl::error() << Message << "\n";
 
         std::exit(EXIT_FAILURE);
     }
 
-    if (InputFiles.empty()) {
-        llvm::errs() << util::cl::Error()
+    if (InputFile.empty()) {
+        llvm::errs() << util::cl::error()
                      << "no input source file specified.\n";
         std::exit(EXIT_FAILURE);
     }
 
-    auto Tool = clang::tooling::ClangTool(*Commands, InputFiles);
+    auto Tool = clang::tooling::ClangTool(*Commands, InputFile);
     Tool.run(&Factory);
 
     return EXIT_SUCCESS;
