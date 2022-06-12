@@ -1,3 +1,5 @@
+[![CI](https://github.com/stnuessl/ccmock/actions/workflows/main.yaml/badge.svg)](https://github.com/stnuessl/ccmock/actions/workflows/main.yaml)
+
 Information within this README might already be outdated.
 
 Current Status of the project
@@ -33,6 +35,7 @@ function mocks for C and C++ projects using Google's
 ### Configuration Precedence Order
 
 1. Command-line arguments
+1. Environment variables
 1. File-specific configuration file
 1. Project-specific configuration file
 
