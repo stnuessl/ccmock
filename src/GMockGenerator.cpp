@@ -86,7 +86,7 @@ void GMockGenerator::HandleTranslationUnit(clang::ASTContext &Context)
 
 void GMockGenerator::dumpMocks(llvm::raw_ostream &os)
 {
-    os << main_out_.str() << "\n";
+    os << GenOutput_.str() << "\n";
 }
 
 void GMockGenerator::writeFileHeader(const clang::ASTContext &Context)
@@ -95,7 +95,7 @@ void GMockGenerator::writeFileHeader(const clang::ASTContext &Context)
     auto FileID = SourceManager.getMainFileID();
     auto Entry = SourceManager.getFileEntryForID(FileID);
 
-    main_out_ << "/*\n"
+    GenOutput_ << "/*\n"
               << " * Automatically generated file\n"
               << " *\n"
               << " * ccmock     : " << CCMOCK_VERSION_CORE << "\n"
@@ -112,17 +112,17 @@ void GMockGenerator::writeFileHeader(const clang::ASTContext &Context)
 
         std::strftime(buf, std::size(buf), "%FT%T%z", &tm);
 
-        main_out_ << " * Date       : " << buf << "\n";
+        GenOutput_ << " * Date       : " << buf << "\n";
     }
 
-    main_out_ << " */\n\n";
+    GenOutput_ << " */\n\n";
 
     writeString(IncludeHeaderString);
 }
 
 void GMockGenerator::writeString(llvm::StringRef Str)
 {
-    main_out_ << Str;
+    GenOutput_ << Str;
 }
 
 void GMockGenerator::writeMockDeclStart()
@@ -138,24 +138,24 @@ void GMockGenerator::writeMockDeclEnd()
 void GMockGenerator::writeType(clang::QualType QualType,
                                const clang::PrintingPolicy &Policy)
 {
-    QualType.print(main_out_, Policy);
+    QualType.print(GenOutput_, Policy);
 }
 
 void GMockGenerator::writeFunctionReturnType(const clang::FunctionDecl *Decl)
 {
     auto &Policy = Decl->getASTContext().getPrintingPolicy();
 
-    Decl->getReturnType().print(main_out_, Policy);
+    Decl->getReturnType().print(GenOutput_, Policy);
 }
 
 void GMockGenerator::writeDeclName(const clang::NamedDecl *Decl)
 {
-    main_out_ << *Decl;
+    GenOutput_ << *Decl;
 }
 
 void GMockGenerator::writeQualifiedName(const clang::NamedDecl *Decl)
 {
-    Decl->printQualifiedName(main_out_);
+    Decl->printQualifiedName(GenOutput_);
 }
 
 void GMockGenerator::writeFunctionParameters(const clang::FunctionDecl *Decl,
@@ -201,9 +201,9 @@ void GMockGenerator::writeFunctionParameters(const clang::FunctionDecl *Decl,
             if (TypeBuffer_.back() != '*' && TypeBuffer_.back() != '&')
                 writeString(" ");
 
-            main_out_ << *Parameter;
+            GenOutput_ << *Parameter;
         } else {
-            Parameter->getType().print(main_out_, Policy);
+            Parameter->getType().print(GenOutput_, Policy);
         }
 
         if (i < Last)
@@ -213,24 +213,25 @@ void GMockGenerator::writeFunctionParameters(const clang::FunctionDecl *Decl,
 
 void GMockGenerator::writeFunctionQualifiers(const clang::FunctionDecl *Decl)
 {
+    (void) Decl;
 }
 
 void GMockGenerator::writeFunctionBody(const clang::FunctionDecl *Decl)
 {
-    main_out_ << "{\n"
+    GenOutput_ << "{\n"
               << "    return mock." << *Decl << "(";
 
     auto Size = Decl->getNumParams();
     auto Last = Size - 1;
 
     for (unsigned int i = 0; i < Size; ++i) {
-        main_out_ << *Decl->getParamDecl(i);
+        GenOutput_ << *Decl->getParamDecl(i);
 
         if (i < Last)
-            main_out_ << ", ";
+            GenOutput_ << ", ";
     }
 
-    main_out_ << ");\n"
+    GenOutput_ << ");\n"
               << "}\n";
 }
 
@@ -240,7 +241,7 @@ void GMockGenerator::generateGlobalMocks(
     if (FuncDeclVec.empty())
         return;
 
-    main_out_ << "class mock {\n"
+    GenOutput_ << "class mock {\n"
               << "public:\n";
 
     for (const auto FunctionDecl : FuncDeclVec) {
@@ -263,7 +264,7 @@ void GMockGenerator::generateGlobalMocks(
 
     writeString("};\n\n");
 
-    main_out_ << "static testing::" << Config_->MockType << "<mock> mock;\n\n";
+    GenOutput_ << "static testing::" << Config_->MockType << "<mock> mock;\n\n";
 
     /*
      * TODO: extern C
@@ -283,7 +284,7 @@ void GMockGenerator::generateGlobalMocks(
         writeString("(");
         writeFunctionParameters(FunctionDecl, /* ParameterNames */ true);
         writeString(")");
-        main_out_ << "\n";
+        GenOutput_ << "\n";
         writeFunctionBody(FunctionDecl);
 
         writeString("\n");

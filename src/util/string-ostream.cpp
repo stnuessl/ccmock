@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "string_ostream.hpp"
+#include "string-ostream.hpp"
 
 namespace util {
 

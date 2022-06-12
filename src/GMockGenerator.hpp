@@ -27,7 +27,7 @@
 
 #include <llvm/ADT/StringRef.h>
 
-#include "util/string_ostream.hpp"
+#include "util/string-ostream.hpp"
 #include "Config.hpp"
 
 class GMockGenerator : public clang::ASTConsumer {
@@ -63,7 +63,7 @@ private:
 
     std::shared_ptr<const Config> Config_;
 
-    util::string_ostream main_out_;
+    util::string_ostream GenOutput_;
     std::string TypeBuffer_;
     clang::Language Language_;
     bool UseExternC;
