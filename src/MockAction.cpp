@@ -24,6 +24,8 @@
 
 #include <llvm/Support/raw_ostream.h>
 
+#include "util/commandline.hpp"
+
 namespace {
 
 std::string DetectClangResourceDirectory()
@@ -56,12 +58,10 @@ std::string DetectClangResourceDirectory()
 std::unique_ptr<clang::ASTConsumer>
 MockAction::CreateASTConsumer(clang::CompilerInstance &CI, llvm::StringRef File)
 {
-    (void) CI;
     (void) File;
 
-    auto Generator = std::make_unique<GMockGenerator>();
-    Generator->setLanguage(getCurrentFileKind().getLanguage());
-    Generator->setConfig(Config_);
+    auto Policy = clang::PrintingPolicy(CI.getLangOpts());
+    auto Generator = std::make_unique<GMockGenerator>(Config_, Policy);
 
     return Generator;
 }

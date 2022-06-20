@@ -334,6 +334,7 @@ DEFS := \
 	-DCCMOCK_VERSION_MINOR=\"$(version_minor)\" \
 	-DCCMOCK_VERSION_PATCH=\"$(version_patch)\" \
 	-DCCMOCK_VERSION_CORE=\"$(version_core)\" \
+	-DCCMOCK_WEBSITE=\"https://github.com/stnuessl/ccmock\" \
 	-DCOPYRIGHT_YEAR=\"$(shell date --date "@$(UNIX_TIME)" +"%Y")\"
 
 #

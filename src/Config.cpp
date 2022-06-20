@@ -39,22 +39,21 @@ public:
         IO.mapOptional("UseColor", Config.UseColor);
         IO.mapOptional("ClangResourceDirectory", Config.ClangResourceDirectory);
         IO.mapOptional("MockStandardLibrary", Config.MockStandardLibrary);
-        IO.mapOptional("MockType", Config.MockType);
+        IO.mapOptional("MockType", Config.MockType, "StrictMock");
+        IO.mapOptional("MockName", Config.MockName, "mock");
+        IO.mapOptional("MockSuffix", Config.MockSuffix);
         IO.mapOptional("Output", Config.Output);
-        IO.mapOptional("Strict", Config.Strict);
-        IO.mapOptional("PrintTimestamp", Config.PrintTimestamp);
-        IO.mapOptional("PrintMainFunction", Config.PrintMainFunction);
+        IO.mapOptional("Strict", Config.Strict, false);
+        IO.mapOptional("WriteDate", Config.WriteDate, true);
+        IO.mapOptional("WriteMain", Config.WriteMain, true);
         IO.mapOptional("Verbose", Config.Verbose);
-        IO.mapOptional("Force", Config.Force);
-        IO.mapOptional("Quiet", Config.Quiet);
+        IO.mapOptional("Force", Config.Force, false);
+        IO.mapOptional("Quiet", Config.Quiet, false);
     }
 
     static std::string validate(llvm::yaml::IO &IO, Config &Config)
     {
         (void) IO;
-
-        if (Config.MockType.empty())
-            return "";
 
         if (Config.MockType == "NaggyMock")
             return "";
@@ -76,9 +75,8 @@ void Config::read(llvm::StringRef Path)
 {
     auto MemBuffer = llvm::MemoryBuffer::getFile(Path);
     if (!MemBuffer) {
-        llvm::errs() << util::cl::error()
-                     << "failed to open \"" << Path << "\": "
-                     << MemBuffer.getError().message() << "\n";
+        llvm::errs() << util::cl::error() << "failed to open \"" << Path
+                     << "\": " << MemBuffer.getError().message() << "\n";
         std::exit(EXIT_FAILURE);
     }
 
@@ -86,8 +84,8 @@ void Config::read(llvm::StringRef Path)
     Input >> *this;
 
     if (Input.error()) {
-        llvm::errs() << util::cl::error()
-                     << "failed to parse \"" << Path << "\".\n";
+        llvm::errs() << util::cl::error() << "failed to parse \"" << Path
+                     << "\".\n";
         std::exit(EXIT_FAILURE);
     }
 }
@@ -99,9 +97,8 @@ void Config::write(llvm::StringRef Path)
     llvm::raw_fd_ostream OS(Path, Error);
 
     if (Error) {
-        llvm::errs() << util::cl::error()
-                     << "failed to open \"" << Path << "\": "
-                     << Error.message() << "\n";
+        llvm::errs() << util::cl::error() << "failed to open \"" << Path
+                     << "\": " << Error.message() << "\n";
         std::exit(EXIT_FAILURE);
     }
 

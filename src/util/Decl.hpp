@@ -15,31 +15,20 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef ACTION_FACTORY_HPP_
-#define ACTION_FACTORY_HPP_
+#ifndef DECL_HPP_
+#define DECL_HPP_
 
-#include <memory>
+#include <clang/AST/Decl.h>
 
-#include <clang/Frontend/FrontendAction.h>
-#include <clang/Tooling/Tooling.h>
+namespace util {
+namespace decl {
 
-#include "Config.hpp"
-
-class ActionFactory : public clang::tooling::FrontendActionFactory {
-public:
-    ActionFactory() = default;
-
-    inline void setConfig(std::shared_ptr<const Config> Config_);
-
-    virtual std::unique_ptr<clang::FrontendAction> create() override;
-
-private:
-    std::shared_ptr<const Config> Config_;
-};
-
-inline void ActionFactory::setConfig(std::shared_ptr<const Config> Config)
+inline bool isGlobalFunction(const clang::FunctionDecl *Decl)
 {
-    Config_ = std::move(Config);
+    return !clang::isa<clang::CXXMethodDecl>(Decl) && Decl->isGlobal();
 }
 
-#endif /* ACTION_FACTORY_HPP_ */
+} // namespace decl
+} // namespace util
+
+#endif /* DECL_HPP_ */

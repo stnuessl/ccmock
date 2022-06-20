@@ -42,7 +42,7 @@ protected:
 
 inline void MockAction::setConfig(std::shared_ptr<const Config> Config)
 {
-    Config_ = Config;
+    Config_ = std::move(Config);
 }
 
 #endif /* MOCK_ACTION_HPP_ */

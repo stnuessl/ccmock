@@ -27,34 +27,29 @@
 
 #include <llvm/ADT/StringRef.h>
 
-#include "util/string-ostream.hpp"
 #include "Config.hpp"
 
 class GMockGenerator : public clang::ASTConsumer {
 public:
-    GMockGenerator() = default;
+    GMockGenerator(std::shared_ptr<const Config> Config,
+                   clang::PrintingPolicy Policy);
 
-    inline void setConfig(std::shared_ptr<const Config> Config);
-    inline void setLanguage(clang::Language Language);
     virtual void HandleTranslationUnit(clang::ASTContext &Context) override;
 
-    void dumpMocks(llvm::raw_ostream &os);
+    void dumpMocks();
 
 private:
-    void writeFileHeader(const clang::ASTContext &Context);
-    void writeString(llvm::StringRef Str);
-    void writeMockDeclStart();
-    void writeMockDeclEnd();
-    void writeType(const clang::QualType QualType,
-                   const clang::PrintingPolicy &Policy);
-    void writeFunctionReturnType(const clang::FunctionDecl *Decl);
-    void writeDeclName(const clang::NamedDecl *Decl);
-    void writeQualifiedName(const clang::NamedDecl *Decl);
-    void writeFunctionParameters(const clang::FunctionDecl *Decl,
-                                 bool ParameterNames = false);
-    void writeFunctionQualifiers(const clang::FunctionDecl *Decl);
+    void writeCommentHeader(const clang::ASTContext &Context);
+    void writeIncludeStatements();
+    void writeGlobalFunctionMocks(
+        const std::vector<const clang::FunctionDecl *> &Vec);
+    void writeClassMethodMocks();
+    void writeMainFunctionDefinition();
 
+    void writeParameterList(const clang::FunctionDecl *Decl);
     void writeFunctionBody(const clang::FunctionDecl *Decl);
+    void writeFunctionSpecifiers(const clang::FunctionDecl *Decl);
+    void writeCLinkage(bool Start);
 
     void
     generateGlobalMocks(const std::vector<const clang::FunctionDecl *> &Vec);
@@ -63,20 +58,9 @@ private:
 
     std::shared_ptr<const Config> Config_;
 
-    util::string_ostream GenOutput_;
-    std::string TypeBuffer_;
-    clang::Language Language_;
-    bool UseExternC;
+    std::string Buffer_;
+    llvm::raw_string_ostream Out_;
+    clang::PrintingPolicy PrintingPolicy_;
 };
-
-inline void GMockGenerator::setConfig(std::shared_ptr<const Config> Config)
-{
-    Config_ = Config;
-}
-
-inline void GMockGenerator::setLanguage(clang::Language Language)
-{
-    Language_ = Language;
-}
 
 #endif /* GMOCK_GENERATOR_HPP_ */

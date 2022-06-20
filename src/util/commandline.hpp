@@ -56,7 +56,7 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const info X)
 {
     (void) X;
 
-    return write(OS, llvm::raw_ostream::MAGENTA, "info: ");
+    return write(OS, llvm::raw_ostream::BLACK, "info: ");
 }
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const warning X)

@@ -43,14 +43,16 @@ public:
     std::string ClangResourceDirectory;
     std::string GlobalFunctionMock;
     std::string MockType;
+    std::string MockName;
+    std::string MockSuffix;
     std::string Output;
     bool MockStandardLibrary;
-    bool PrintTimestamp;
+    bool WriteDate;
     bool Strict;
     bool Verbose;
     bool Force;
     bool Quiet;
-    bool PrintMainFunction;
+    bool WriteMain;
     enum UseColorType UseColor;
 
 private:

@@ -24,13 +24,12 @@
 
 void ASTVisitor::setConfig(std::shared_ptr<const Config> Config)
 {
-    Config_ = Config;
+    Config_ = std::move(Config);
 
     for (const auto &Name : Config_->Blacklist) {
         Blacklist_.insert(Name);
     }
 }
-
 
 bool ASTVisitor::VisitCallExpr(clang::CallExpr *CallExpr)
 {
@@ -65,6 +64,12 @@ void ASTVisitor::dispatch(const clang::FunctionDecl *FunctionDecl)
     if (!FunctionDecl)
         return;
 
+    if (FunctionDecl->isStatic())
+        return;
+
+    if (FunctionDecl->isInlined())
+        return;
+
     if (FunctionDecl->hasBody())
         return;
 
@@ -72,6 +77,16 @@ void ASTVisitor::dispatch(const clang::FunctionDecl *FunctionDecl)
     if (Blacklist_.count(FunctionDecl->getQualifiedNameAsString())) {
         llvm::errs() << "Ignoring: " << *FunctionDecl << "\n";
         return;
+    }
+
+    if (FunctionDecl->isVariadic()) {
+        /* TODO: raise to error if "--strict" */
+        llvm::errs() << util::cl::warning()
+                     << "cannot process variadic function \"" << *FunctionDecl
+                     << "\"\n";
+        if (Config_->Strict) {
+            std::exit(EXIT_FAILURE);
+        }
     }
     //
     //    if (FunctionDecl->willHaveBody())
@@ -113,8 +128,8 @@ void ASTVisitor::doVisitCallExpr(const clang::CallExpr *CallExpr)
 
     if (Config_->MockStandardLibrary) {
         if (SourceManager_->isInSystemHeader(FunctionDecl->getLocation()))
-            llvm::errs() << util::cl::info()
-                         << *FunctionDecl << ": is Systemheader\n";
+            llvm::errs() << util::cl::info() << *FunctionDecl
+                         << ": is Systemheader\n";
     }
 
     dispatch(FunctionDecl);
