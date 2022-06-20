@@ -15,30 +15,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef STRING_OSTREAM_HPP_
-#define STRING_OSTREAM_HPP_
+#include <stdlib.h>
 
-#include <string>
+#include "callback.h"
 
-#include <llvm/Support/raw_ostream.h>
+void callback_invoke(void *(*callback)(void *, void *) );
 
-namespace util {
-
-class string_ostream : public llvm::raw_ostream {
-public:
-    explicit string_ostream(std::size_t size = BUFSIZ);
-
-    virtual uint64_t current_pos() const override;
-    virtual void write_impl(const char *Ptr, size_t Size) override;
-
-    void clear();
-
-    const std::string &str() const;
-
-private:
-    std::string buffer_;
-};
-
-} // namespace util
-
-#endif /* STRING_OSTREAM_HPP_ */
+void callback_main(void)
+{
+    callback_invoke(NULL);
+}

@@ -15,7 +15,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -27,7 +26,6 @@ extern "C" {
 #endif
 
 #include "fac.inc"
-
 
 TEST(fac, basic)
 {
@@ -46,4 +44,3 @@ TEST(fac, basic)
 
     ASSERT_EQ(24, fac(4));
 }
-

@@ -32,7 +32,7 @@ obj		:= $(patsubst %.c,%.o,$(src))
 ut_src	:= $(shell find test -name "*.cpp")
 ut_obj	:= $(patsubst %.cpp,%.o,$(ut_src))
 ut_gen	:= $(patsubst src/%.c,test/%.inc,$(src))
-ut_bin	:= $(patsubst %.cpp,%.elf,$(ut_src))
+ut_bin	:= $(patsubst %.cpp,%,$(ut_src))
 ut_out	:= $(patsubst %.cpp,%.txt,$(ut_src))
 
 CPPFLAGS	:= $(shell pkg-config --cflags gmock gtest)
@@ -56,10 +56,10 @@ all: tests
 
 tests: $(ut_out)
 
-%.txt: %.elf
+%.txt: %
 	./$< | tee $@
 
-test/%.elf: test/%.o src/%.o
+test/%: test/%.o src/%.o
 	$(LD) -o $@ $(CXXFLAGS) $(LDFLAGS) $(LDLIBS) $^
 
 src/%.o: src/%.c

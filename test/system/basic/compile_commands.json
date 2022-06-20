@@ -4,5 +4,11 @@
         "file": "src/fac.c",
         "output": "src/fac.o",
         "arguments": ["clang", "-c", "-o", "src/fac.o", "-std=c11", "-I", "src", "src/fac.c"]
+    },
+    {
+        "directory": "/home/bockler/Projects/ccmock/test/system/basic",
+        "file": "src/invoke.c",
+        "output": "src/invoke.o",
+        "arguments": ["clang", "-c", "-o", "src/invoke.o", "-std=c11", "-I", "src", "src/invoke.c"]
     }
 ]

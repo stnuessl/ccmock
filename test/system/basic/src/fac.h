@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef FAC_H_ 
+#ifndef FAC_H_
 #define FAC_H_
 
 int fac(int n);

@@ -15,21 +15,21 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#include <util/string-ostream.hpp>
+#include "callback.h"
 
-TEST(string_ostream, constructor)
-{
-    util::string_ostream ostream;
-
-    ASSERT_EQ(BUFSIZ, ostream.str().capacity());
+#ifdef __cplusplus
 }
+#endif
 
-int main(int argc, char *argv[])
+#include "callback.inc"
+
+TEST(invoke_main, basic)
 {
-    testing::InitGoogleTest(&argc, argv);
+    EXPECT_CALL(mock, callback_invoke(nullptr));
 
-    return RUN_ALL_TESTS();
+    callback_main();
 }

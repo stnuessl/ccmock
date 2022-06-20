@@ -15,34 +15,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "string-ostream.hpp"
+#ifndef CALLBACK_H_
+#define CALLBACK_H_
 
-namespace util {
+void callback_main(void);
 
-string_ostream::string_ostream(std::size_t size)
-    : llvm::raw_ostream(true), buffer_()
-{
-    buffer_.reserve(size);
-}
-
-uint64_t string_ostream::current_pos() const
-{
-    return buffer_.size();
-}
-
-void string_ostream::write_impl(const char *ptr, size_t size)
-{
-    buffer_.append(ptr, size);
-}
-
-void string_ostream::clear()
-{
-    buffer_.clear();
-}
-
-const std::string &string_ostream::str() const
-{
-    return buffer_;
-}
-
-} // namespace util
+#endif /* CALLBACK_H_ */
