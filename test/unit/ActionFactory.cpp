@@ -18,13 +18,38 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include <util/string-ostream.hpp>
+#include <MockAction.hpp>
+#include <ActionFactory.hpp>
 
-TEST(string_ostream, constructor)
+std::unique_ptr<clang::ASTConsumer>
+MockAction::CreateASTConsumer(clang::CompilerInstance &CI,
+                      llvm::StringRef File)
 {
-    util::string_ostream ostream;
+    (void) CI;
+    (void) File;
 
-    ASSERT_EQ(BUFSIZ, ostream.str().capacity());
+    return nullptr;
+}
+
+bool MockAction::PrepareToExecuteAction(clang::CompilerInstance &CI)
+{
+    (void) CI;
+
+    return true;
+}
+
+void MockAction::EndSourceFileAction()
+{
+
+}
+
+TEST(ActionFactory, Create)
+{
+    auto Factory = ActionFactory();
+
+    auto Action = Factory.create();
+
+    ASSERT_TRUE(Action);
 }
 
 int main(int argc, char *argv[])
@@ -33,3 +58,4 @@ int main(int argc, char *argv[])
 
     return RUN_ALL_TESTS();
 }
+
