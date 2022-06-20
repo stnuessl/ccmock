@@ -472,8 +472,8 @@ ut_objs := \
 #
 # Every unit test source file has its own executable and report file.
 #
-ut_tests	:= $(patsubst %.cpp,$(ut_bindir)/%.elf,$(ut_src))
-ut_reports	:= $(patsubst %.elf,%.txt,$(ut_tests))
+ut_tests	:= $(patsubst %.cpp,$(ut_bindir)/%,$(ut_src))
+ut_reports	:= $(patsubst %,%.txt,$(ut_tests))
 
 dirs += \
 	$(ut_dir) \
@@ -646,11 +646,11 @@ $(ut_info): $(ut_reports)
 		--rc lcov_branch_coverage=1 \
 		--rc lcov_function_coverage=1
 
-$(ut_bindir)/%.txt: $(ut_bindir)/%.elf
+$(ut_bindir)/%.txt: $(ut_bindir)/%
 	@printf "$(magenta)Executing [ $< ]$(reset)\n"
 	$(Q)./$< | tee $@ || (rm -f $@ && false)
 
-$(ut_bindir)/%.elf: \
+$(ut_bindir)/%: \
 	$(ut_bindir)/%.$(OBJ_SUFFIX) $(ut_dir)/$(srcdir)/%.$(OBJ_SUFFIX)
 	@printf "$(yellow)Linking [ $@ ]$(reset)\n"
 	$(Q)gcc -o $@ $^ $(LDFLAGS) $(LDLIBS)
