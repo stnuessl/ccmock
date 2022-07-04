@@ -15,44 +15,26 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
+#ifndef PATH_HPP_
+#define PATH_HPP_
 
-#include <ActionFactory.hpp>
-#include <MockAction.hpp>
+#include <string>
+#include <filesystem>
 
-std::unique_ptr<clang::ASTConsumer>
-MockAction::CreateASTConsumer(clang::CompilerInstance &CI, llvm::StringRef File)
-{
-    (void) CI;
-    (void) File;
+#include <llvm/ADT/StringRef.h>
 
-    return nullptr;
-}
+namespace util {
 
-bool MockAction::PrepareToExecuteAction(clang::CompilerInstance &CI)
-{
-    (void) CI;
+namespace path {
 
-    return true;
-}
+std::filesystem::path make_relative(llvm::StringRef Path);
 
-void MockAction::EndSourceFileAction()
-{
-}
+std::filesystem::path make_relative(llvm::StringRef Path, 
+                                    const std::filesystem::path &Base);
 
-TEST(ActionFactory, Create)
-{
-    auto Factory = ActionFactory();
 
-    auto Action = Factory.create();
+} /* namespace path */
 
-    ASSERT_TRUE(Action);
-}
+} /* namespace util */
 
-int main(int argc, char *argv[])
-{
-    testing::InitGoogleTest(&argc, argv);
-
-    return RUN_ALL_TESTS();
-}
+#endif /* PATH_HPP_ */

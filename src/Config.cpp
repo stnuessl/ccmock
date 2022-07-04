@@ -22,6 +22,27 @@
 namespace llvm {
 namespace yaml {
 
+template <> struct ScalarTraits<std::filesystem::path> {
+    static void
+    output(const std::filesystem::path &Value, void *, llvm::raw_ostream &Out)
+    {
+        Out << Value.native();
+    }
+
+    static llvm::StringRef
+    input(llvm::StringRef Scalar, void *, std::filesystem::path &Value)
+    {
+        Value = Scalar.str();
+
+        return llvm::StringRef();
+    }
+
+    static QuotingType mustQuote(StringRef Str)
+    {
+        return needsQuotes(Str);
+    }
+};
+
 template <> struct ScalarEnumerationTraits<Config::UseColorType> {
     static void enumeration(IO &io, Config::UseColorType &Value)
     {
@@ -36,19 +57,22 @@ public:
     static void mapping(llvm::yaml::IO &IO, Config &Config)
     {
         IO.mapOptional("Blacklist", Config.Blacklist);
+        IO.mapOptional("BaseDirectory", Config.BaseDirectory);
         IO.mapOptional("UseColor", Config.UseColor);
+        IO.mapOptional("CompileCommands", Config.CompileCommands);
         IO.mapOptional("ClangResourceDirectory", Config.ClangResourceDirectory);
         IO.mapOptional("MockStandardLibrary", Config.MockStandardLibrary);
-        IO.mapOptional("MockType", Config.MockType, "StrictMock");
-        IO.mapOptional("MockName", Config.MockName, "mock");
+        IO.mapOptional("MockBuiltins", Config.MockBuiltins);
+        IO.mapOptional("MockType", Config.MockType);
+        IO.mapOptional("MockName", Config.MockName);
         IO.mapOptional("MockSuffix", Config.MockSuffix);
         IO.mapOptional("Output", Config.Output);
-        IO.mapOptional("Strict", Config.Strict, false);
-        IO.mapOptional("WriteDate", Config.WriteDate, true);
-        IO.mapOptional("WriteMain", Config.WriteMain, true);
+        IO.mapOptional("Strict", Config.Strict);
+        IO.mapOptional("WriteDate", Config.WriteDate);
+        IO.mapOptional("WriteMain", Config.WriteMain);
         IO.mapOptional("Verbose", Config.Verbose);
-        IO.mapOptional("Force", Config.Force, false);
-        IO.mapOptional("Quiet", Config.Quiet, false);
+        IO.mapOptional("Force", Config.Force);
+        IO.mapOptional("Quiet", Config.Quiet);
     }
 
     static std::string validate(llvm::yaml::IO &IO, Config &Config)
@@ -71,6 +95,26 @@ public:
 } // namespace yaml
 } // namespace llvm
 
+Config::Config()
+    : Blacklist(),
+      BaseDirectory(),
+      ClangResourceDirectory(),
+      MockType("StrictMock"),
+      MockName("mock"),
+      MockSuffix("_mock"),
+      Output(),
+      MockBuiltins(false),
+      MockStandardLibrary(false),
+      WriteDate(true),
+      Strict(false),
+      Verbose(false),
+      Force(false),
+      Quiet(false),
+      WriteMain(true),
+      UseColor(Config::UseColorType::AUTO)
+{
+}
+
 void Config::read(llvm::StringRef Path)
 {
     auto MemBuffer = llvm::MemoryBuffer::getFile(Path);
@@ -80,10 +124,10 @@ void Config::read(llvm::StringRef Path)
         std::exit(EXIT_FAILURE);
     }
 
-    llvm::yaml::Input Input(MemBuffer.get()->getBuffer());
-    Input >> *this;
+    llvm::yaml::Input YamlInput(MemBuffer.get()->getBuffer());
+    YamlInput >> *this;
 
-    if (Input.error()) {
+    if (YamlInput.error()) {
         llvm::errs() << util::cl::error() << "failed to parse \"" << Path
                      << "\".\n";
         std::exit(EXIT_FAILURE);
@@ -107,7 +151,7 @@ void Config::write(llvm::StringRef Path)
 
 void Config::write(llvm::raw_ostream &OS)
 {
-    auto Output = llvm::yaml::Output(OS);
+    auto YamlOutput = llvm::yaml::Output(OS);
 
-    Output << *this;
+    YamlOutput << *this;
 }

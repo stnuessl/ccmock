@@ -24,12 +24,13 @@
 #include <vector>
 
 #include <clang/AST/RecursiveASTVisitor.h>
+#include <llvm/Support/GlobPattern.h>
 
 #include "Config.hpp"
 
 class ASTVisitor : public clang::RecursiveASTVisitor<ASTVisitor> {
 public:
-    ASTVisitor() = default;
+    ASTVisitor();
 
     inline void setSourceManager(clang::SourceManager *SourceManager);
     void setConfig(std::shared_ptr<const Config> Config);
@@ -47,8 +48,10 @@ private:
     void doVisitCallExpr(const clang::CallExpr *CallExpr);
     void doVisitCXXConstructExpr(const clang::CXXConstructExpr *ConstructExpr);
 
+    std::string Buffer_;
     std::shared_ptr<const Config> Config_;
 
+    std::vector<std::pair<llvm::StringRef, llvm::GlobPattern>> GlobBlacklist_;
     std::unordered_map<int64_t, const clang::FunctionDecl *> FunctionDeclMap_;
     std::unordered_set<std::string> Blacklist_;
     clang::SourceManager *SourceManager_;

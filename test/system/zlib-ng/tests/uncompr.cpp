@@ -19,18 +19,31 @@
 extern "C" {
 #endif
 
-#include "callback.h"
+#include "../src/zbuild.h"
+#include "../src/zlib-ng.h"
 
 #ifdef __cplusplus
 }
 #endif
 
-#include "callback.inc"
+#include "uncompr.inc"
 
-TEST(invoke_main, basic)
+TEST(uncompress, 001)
 {
-    EXPECT_CALL(mock, callback_invoke1(nullptr));
-    EXPECT_CALL(mock, callback_invoke2(nullptr));
+    const unsigned char src[] = {0xff};
+    unsigned char dst[1];
+    z_size_t size = std::size(dst);
 
-    callback_main();
+    EXPECT_CALL(mock,
+                PREFIX(inflateInit_)(testing::_,
+                                     testing::StrEq(ZLIBNG_VERSION),
+                                     (int32_t) sizeof(PREFIX3(stream))))
+        .WillOnce(testing::Return(Z_OK));
+
+    EXPECT_CALL(mock, PREFIX(inflate)(testing::_, Z_NO_FLUSH))
+        .WillOnce(testing::Return(Z_STREAM_END));
+
+    EXPECT_CALL(mock, PREFIX(inflateEnd)(testing::_));
+
+    ASSERT_EQ(Z_OK, PREFIX(uncompress)(dst, &size, src, std::size(src)));
 }

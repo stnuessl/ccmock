@@ -18,6 +18,7 @@
 #ifndef CONFIG_HPP_
 #define CONFIG_HPP_
 
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -32,20 +33,21 @@ public:
         ALWAYS,
     };
 
-    Config() = default;
+    Config();
 
     void read(llvm::StringRef Path);
     void write(llvm::StringRef Path);
     void write(llvm::raw_ostream &OS);
 
     std::vector<std::string> Blacklist;
-    std::string CompilationDatabase;
+    std::filesystem::path BaseDirectory;
+    std::string CompileCommands;
     std::string ClangResourceDirectory;
-    std::string GlobalFunctionMock;
     std::string MockType;
     std::string MockName;
     std::string MockSuffix;
-    std::string Output;
+    std::filesystem::path Output;
+    bool MockBuiltins;
     bool MockStandardLibrary;
     bool WriteDate;
     bool Strict;

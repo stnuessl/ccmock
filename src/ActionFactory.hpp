@@ -29,7 +29,7 @@ class ActionFactory : public clang::tooling::FrontendActionFactory {
 public:
     ActionFactory() = default;
 
-    inline void setConfig(std::shared_ptr<const Config> Config_);
+    inline void setConfig(std::shared_ptr<const Config> Config);
 
     virtual std::unique_ptr<clang::FrontendAction> create() override;
 

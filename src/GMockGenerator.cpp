@@ -15,28 +15,32 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <iomanip>
-#include <time.h>
+#include <ctime>
 
 #include <clang/Basic/SourceManager.h>
 #include <clang/Basic/Version.h>
+
 #include <llvm/Config/llvm-config.h>
+#include <llvm/Support/Process.h>
 
 #include "ASTVisitor.hpp"
 #include "GMockGenerator.hpp"
 
 #include "util/Decl.hpp"
+#include "util/Path.hpp"
 #include "util/Type.hpp"
 #include "util/commandline.hpp"
 
 GMockGenerator::GMockGenerator(std::shared_ptr<const Config> Config,
                                clang::PrintingPolicy Policy)
-    : Config_(std::move(Config)), Buffer_(), Out_(Buffer_),
+    : Config_(std::move(Config)),
+      Buffer_(),
+      Out_(Buffer_),
       PrintingPolicy_(Policy)
 {
     Buffer_.reserve(BUFSIZ);
 
-    /* There is not much choice here as the gmock library is  written in C++ */
+    /* There is not much choice here as the gmock library is written in C++ */
     PrintingPolicy_.adjustForCPlusPlus();
 }
 
@@ -71,11 +75,11 @@ void GMockGenerator::dumpMocks()
     std::error_code error;
 
     if (Config_->Output.empty()) {
-        llvm::outs() << Out_.str() << "\n";
+        llvm::outs() << Buffer_ << "\n";
         return;
     }
 
-    auto outs = llvm::raw_fd_stream(Config_->Output, error);
+    auto outs = llvm::raw_fd_stream(Config_->Output.native(), error);
     if (error) {
         llvm::errs() << util::cl::error() << "failed to open \""
                      << Config_->Output << "\": " << error.message() << "\n";
@@ -91,10 +95,6 @@ void GMockGenerator::writeCommentHeader(const clang::ASTContext &Context)
     auto FileID = SourceManager.getMainFileID();
     auto Entry = SourceManager.getFileEntryForID(FileID);
 
-    llvm::StringRef Output = "-";
-    if (!Config_->Output.empty())
-        Output = Config_->Output;
-
     /* clang-format off */
     Out_ << 
 "/*\n"
@@ -108,7 +108,7 @@ void GMockGenerator::writeCommentHeader(const clang::ASTContext &Context)
         struct tm tm;
 
         auto Now = std::time(nullptr);
-        gmtime_r(&Now, &tm);
+        (void) gmtime_r(&Now, &tm);
 
         std::strftime(buf, std::size(buf), "%FT%T%z", &tm);
 
@@ -116,9 +116,17 @@ void GMockGenerator::writeCommentHeader(const clang::ASTContext &Context)
 " *     Date        : " << buf << "\n";
     }
 
-        Out_ << 
-" *     Input       : " << Entry->getName() << "\n"
-" *     Output      : " << Output << "\n";
+    auto &Base = Config_->BaseDirectory;
+    auto Input = util::path::make_relative(Entry->getName(), Base);
+    auto Output = util::path::make_relative(Config_->Output.native(), Base);
+    
+    if (Output.empty())
+        Output = "-";
+
+    Out_ <<
+" *     Input       : " << Input << "\n"
+" *     Output      : " << Output << "\n"
+" *     Directory   : " << Base << "\n";
 
     Out_ <<
 R"( *
@@ -178,7 +186,7 @@ void GMockGenerator::writeGlobalFunctionMocks(
         Out_ << "    MOCK_METHOD((";
         FunctionDecl->getReturnType().print(Out_, PrintingPolicy_);
         Out_ << "), " << *FunctionDecl << ", ";
-        writeParameterList(FunctionDecl);
+        writeParameterList(FunctionDecl, /* WriteParmVarNames */ false);
         Out_ << ");\n";
     }
 
@@ -195,25 +203,23 @@ void GMockGenerator::writeGlobalFunctionMocks(
     Out_ << "static testing::" << MockType << "<" << Config_->MockName << "> "
          << Config_->MockName << ";\n\n";
 
-    bool PrevExternC = false;
-
     /* Write the mock function definitions */
     for (const auto FunctionDecl : Vec) {
-        bool ExternC = FunctionDecl->isExternC();
+        if (FunctionDecl->isExternC())
+            Out_ << "extern \"C\" ";
 
-        if (PrevExternC != ExternC) {
-            writeCLinkage(ExternC);
-            PrevExternC = ExternC;
-        }
+        auto Type = FunctionDecl->getReturnType();
+        Type.print(Out_, PrintingPolicy_);
 
-        FunctionDecl->print(Out_, PrintingPolicy_);
+        if (!util::type::isPointerOrReference(Type))
+            Out_ << " ";
+
+        Out_ << *FunctionDecl;
+        writeParameterList(FunctionDecl, /* WriteParmVarNames */ true);
         Out_ << "\n";
         writeFunctionBody(FunctionDecl);
         Out_ << "\n";
     }
-
-    if (PrevExternC)
-        writeCLinkage(false);
 }
 
 void GMockGenerator::writeClassMethodMocks()
@@ -238,8 +244,64 @@ int main(int argc, char *argv[])
     /* clang-format on */
 }
 
-void GMockGenerator::writeParameterList(const clang::FunctionDecl *Decl)
+void GMockGenerator::writeParmVarDecl(const clang::ParmVarDecl *Decl,
+                                      bool WriteParmVarName,
+                                      llvm::StringRef Fallback)
 {
+    if (!WriteParmVarName) {
+        Decl->getType().print(Out_, PrintingPolicy_);
+        return;
+    }
+
+    if (!Decl->getName().empty()) {
+        Decl->print(Out_, PrintingPolicy_);
+        return;
+    }
+
+    auto Type = Decl->getType();
+
+    if (!util::type::isPointerOrReference(Type)) {
+        Type.print(Out_, PrintingPolicy_);
+
+        if (!util::type::isPointerOrReference(Type))
+            Out_ << " ";
+
+        Out_ << Fallback;
+        return;
+    }
+
+    /*
+     * Function pointers or references can be extremely tricky to print
+     * as the name of the corresponding variable is surrounded by its own
+     * type, e.g.:
+     *      void *(*func)(void (*)(int, int))
+     *             ^~~~
+     * We therefore create a new VarDecl (which is obviously not part of
+     * the parsed source code) with an appropriate name and then let clang's
+     * "Decl::print" function do the heavy lifting.
+     */
+    auto &ASTContext = Decl->getASTContext();
+    auto Loc = clang::SourceLocation();
+
+    auto &IdInfo = ASTContext.Idents.getOwn(Fallback);
+
+    auto VarDecl = clang::VarDecl::Create(ASTContext,
+                                          ASTContext.getTranslationUnitDecl(),
+                                          Loc,
+                                          Loc,
+                                          &IdInfo,
+                                          Type,
+                                          nullptr,
+                                          clang::StorageClass::SC_None);
+
+    VarDecl->print(Out_, PrintingPolicy_);
+}
+
+void GMockGenerator::writeParameterList(const clang::FunctionDecl *Decl,
+                                        bool WriteParmVarNames)
+{
+    std::string Fallback;
+    llvm::raw_string_ostream FallbackOS(Fallback);
     auto Parameters = Decl->parameters();
 
     if (Parameters.empty()) {
@@ -251,17 +313,18 @@ void GMockGenerator::writeParameterList(const clang::FunctionDecl *Decl)
         return;
     }
 
-    auto Last = Parameters.size() - 1;
-
     Out_ << "(";
 
-    for (unsigned int i = 0; i < Last; ++i) {
-        Parameters[i]->print(Out_, PrintingPolicy_);
+    for (unsigned int i = 0, Size = Parameters.size(); i < Size; ++i) {
+        if (i != 0)
+            Out_ << ", ";
 
-        Out_ << ", ";
+        Fallback.clear();
+        FallbackOS << "arg" << i + 1;
+
+        writeParmVarDecl(Parameters[i], WriteParmVarNames, Fallback);
     }
 
-    Parameters.back()->print(Out_, PrintingPolicy_);
     Out_ << ")";
 }
 
@@ -270,38 +333,34 @@ void GMockGenerator::writeFunctionSpecifiers(const clang::FunctionDecl *Decl)
     (void) Decl;
 }
 
-void GMockGenerator::writeCLinkage(bool Start)
-{
-    Out_ << "#ifdef __cplusplus\n";
-
-    if (Start)
-        Out_ << "extern \"C\" {\n";
-    else
-        Out_ << "}\n";
-
-    Out_ << "#endif\n";
-}
-
 void GMockGenerator::writeFunctionBody(const clang::FunctionDecl *Decl)
 {
     auto Parameters = Decl->parameters();
-    auto Last = Parameters.size() - 1;
 
     /*
-     * Output has to look something like:
-     *      {
-     *          return mock.func(arg1, arg2);
-     *      }
+     * Example output:
+     *  {
+     *      return mock.func(arg1, arg2);
+     *  }
      */
     Out_ << "{\n"
-            "   return "
-         << Config_->MockName << "." << *Decl << "(";
+         << "    ";
 
-    for (unsigned int i = 0; i < Last; ++i) {
-        Out_ << *Parameters[i] << ", ";
+    if (!Decl->getReturnType()->isVoidType())
+        Out_ << "return ";
+
+    Out_ << Config_->MockName << "." << *Decl << "(";
+
+    for (unsigned int i = 0, Size = Parameters.size(); i < Size; ++i) {
+        if (i != 0)
+            Out_ << ", ";
+
+        if (!Parameters[i]->getName().empty())
+            Out_ << *Parameters[i];
+        else
+            Out_ << "arg" << i + 1;
     }
 
-    Out_ << *Parameters.back()
-         << ");\n"
+    Out_ << ");\n"
             "}\n";
 }

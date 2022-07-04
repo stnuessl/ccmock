@@ -20,14 +20,42 @@
 #include <clang/Basic/SourceManager.h>
 
 #include "ASTVisitor.hpp"
+#include "util/Glob.hpp"
 #include "util/commandline.hpp"
+
+ASTVisitor::ASTVisitor()
+    : Buffer_(),
+      Config_(),
+      GlobBlacklist_(),
+      FunctionDeclMap_(),
+      Blacklist_(),
+      SourceManager_()
+{
+    Buffer_.reserve(256);
+    FunctionDeclMap_.reserve(256);
+    Blacklist_.reserve(64);
+}
 
 void ASTVisitor::setConfig(std::shared_ptr<const Config> Config)
 {
     Config_ = std::move(Config);
 
     for (const auto &Name : Config_->Blacklist) {
-        Blacklist_.insert(Name);
+        if (util::glob::isPattern(Name)) {
+            auto ExpectedGlob = llvm::GlobPattern::create(Name);
+
+            if (!ExpectedGlob) {
+                llvm::errs() << util::cl::error() 
+                             << ExpectedGlob.takeError() 
+                             << "\n";
+
+                std::exit(EXIT_FAILURE);
+            }
+
+            GlobBlacklist_.push_back({ Name, std::move(*ExpectedGlob) });
+        } else {
+            Blacklist_.insert(Name);
+        }
     }
 }
 
@@ -59,50 +87,69 @@ std::vector<const clang::FunctionDecl *> ASTVisitor::takeFunctionDecls()
     return Vector;
 }
 
-void ASTVisitor::dispatch(const clang::FunctionDecl *FunctionDecl)
+void ASTVisitor::dispatch(const clang::FunctionDecl *Decl)
 {
-    if (!FunctionDecl)
+    llvm::raw_string_ostream OS(Buffer_);
+
+    if (!Decl)
         return;
 
-    if (FunctionDecl->isStatic())
+    if (Decl->isStatic())
         return;
 
-    if (FunctionDecl->isInlined())
+    if (Decl->isInlined())
         return;
 
-    if (FunctionDecl->hasBody())
+    if (Decl->hasBody())
         return;
 
-    /* TODO: remove inefficience due to *AsString() */
-    if (Blacklist_.count(FunctionDecl->getQualifiedNameAsString())) {
-        llvm::errs() << "Ignoring: " << *FunctionDecl << "\n";
+    if (Decl->isInStdNamespace())
+        return;
+
+    if (Decl->getBuiltinID() != 0u && !Config_->MockBuiltins)
+        return;
+
+    Buffer_.clear();
+    Decl->printQualifiedName(OS);
+
+    if (Blacklist_.count(Buffer_)) {
+        if (Config_->Verbose) {
+            llvm::errs() << util::cl::info() << Buffer_
+                         << ": skipping function due to blacklist entry\n";
+        }
         return;
     }
 
-    if (FunctionDecl->isVariadic()) {
+    for (const auto &[Pattern, Glob] : GlobBlacklist_) {
+        if (Glob.match(Buffer_)) {
+            if (Config_->Verbose) {
+                llvm::errs() << util::cl::info() << Buffer_
+                             << ": skipping function due to blacklist entry \""
+                             << Pattern << "\"\n";
+            }
+
+            return;
+        }
+    }
+
+    if (Decl->isVariadic()) {
         /* TODO: raise to error if "--strict" */
         llvm::errs() << util::cl::warning()
-                     << "cannot process variadic function \"" << *FunctionDecl
+                     << "cannot process variadic function \"" << *Decl
                      << "\"\n";
         if (Config_->Strict) {
             std::exit(EXIT_FAILURE);
         }
     }
-    //
-    //    if (FunctionDecl->willHaveBody())
-    //       return;
-    //
-    //    if (FunctionDecl->isDefined())
-    //        return;
 
-    auto ID = FunctionDecl->getID();
+    auto ID = Decl->getID();
 
     if (FunctionDeclMap_.count(ID) != 0)
         return;
 
-    auto [it, ok] = FunctionDeclMap_.insert({ID, FunctionDecl});
+    auto [it, ok] = FunctionDeclMap_.insert({ID, Decl});
     if (!ok) {
-        FunctionDecl->printQualifiedName(llvm::errs());
+        Decl->printQualifiedName(llvm::errs());
         llvm::errs() << ": ";
 
         if (Config_->Strict)
@@ -124,15 +171,9 @@ void ASTVisitor::doVisitCallExpr(const clang::CallExpr *CallExpr)
     if (!SourceManager_->isInMainFile(Loc))
         return;
 
-    auto FunctionDecl = CallExpr->getDirectCallee();
+    auto Decl = CallExpr->getDirectCallee();
 
-    if (Config_->MockStandardLibrary) {
-        if (SourceManager_->isInSystemHeader(FunctionDecl->getLocation()))
-            llvm::errs() << util::cl::info() << *FunctionDecl
-                         << ": is Systemheader\n";
-    }
-
-    dispatch(FunctionDecl);
+    dispatch(Decl);
 }
 
 void ASTVisitor::doVisitCXXConstructExpr(

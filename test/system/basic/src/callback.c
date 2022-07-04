@@ -19,9 +19,11 @@
 
 #include "callback.h"
 
-void callback_invoke(void *(*callback)(void *, void *) );
+void callback_invoke1(void *(*)(void *, void *) );
+void callback_invoke2(int (*(*func)(long num))(int a, int b));
 
 void callback_main(void)
 {
-    callback_invoke(NULL);
+    callback_invoke1(NULL);
+    callback_invoke2(NULL);
 }

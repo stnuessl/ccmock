@@ -46,10 +46,13 @@ private:
     void writeClassMethodMocks();
     void writeMainFunctionDefinition();
 
-    void writeParameterList(const clang::FunctionDecl *Decl);
+    void writeParmVarDecl(const clang::ParmVarDecl *Decl,
+                          bool WriteParmVarName,
+                          llvm::StringRef Fallback = llvm::StringRef());
+    void writeParameterList(const clang::FunctionDecl *Decl,
+                            bool WriteParmVarNames);
     void writeFunctionBody(const clang::FunctionDecl *Decl);
     void writeFunctionSpecifiers(const clang::FunctionDecl *Decl);
-    void writeCLinkage(bool Start);
 
     void
     generateGlobalMocks(const std::vector<const clang::FunctionDecl *> &Vec);

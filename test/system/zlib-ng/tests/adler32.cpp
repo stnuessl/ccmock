@@ -15,44 +15,36 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#include <ActionFactory.hpp>
-#include <MockAction.hpp>
+#include "../src/functable.h"
+#include "../src/zbuild.h"
+#include "../src/zlib-ng.h"
 
-std::unique_ptr<clang::ASTConsumer>
-MockAction::CreateASTConsumer(clang::CompilerInstance &CI, llvm::StringRef File)
-{
-    (void) CI;
-    (void) File;
+/*
+ * Function declarations which are not availabie via header files.
+ * Be aware that these functions need C linkage .
+ */
+uint32_t adler32_c(uint32_t adler, const unsigned char *buf, size_t len);
 
-    return nullptr;
+#ifdef __cplusplus
 }
+#endif
 
-bool MockAction::PrepareToExecuteAction(clang::CompilerInstance &CI)
+/* zlib-ng and gtest both define their own "Assert" ... */
+#ifdef Assert
+#undef Assert
+#endif
+
+#include "adler32.inc"
+
+struct functable_s functable;
+
+TEST(adler32_c, 001)
 {
-    (void) CI;
+    functable.adler32 = &adler32_c;
 
-    return true;
-}
-
-void MockAction::EndSourceFileAction()
-{
-}
-
-TEST(ActionFactory, Create)
-{
-    auto Factory = ActionFactory();
-
-    auto Action = Factory.create();
-
-    ASSERT_TRUE(Action);
-}
-
-int main(int argc, char *argv[])
-{
-    testing::InitGoogleTest(&argc, argv);
-
-    return RUN_ALL_TESTS();
+    ASSERT_EQ(1, adler32_c(0, nullptr, 0));
 }

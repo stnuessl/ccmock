@@ -51,6 +51,11 @@ dirs := \
 	$(DOCKER_DIR) \
 	$(SCAN_DIR)
 
+#
+# Disable automatic deletion of intermediate files
+#
+.SECONDARY:
+
 all: $(patsubst %,$(DOCKER_DIR)/%.ack,$(targets))
 
 %: $(DOCKER_DIR)/%.ack
@@ -58,7 +63,6 @@ all: $(patsubst %,$(DOCKER_DIR)/%.ack,$(targets))
 		--interactive \
 		--tty=$(if $(CMD),false,true) \
 		--rm \
-		--env XDG_SESSION_TYPE \
 		--env ARTIFACTORY_API_KEY \
 		--volume ${PWD}:/crudebox \
 		--user $$(id -u):$$(id -g) \

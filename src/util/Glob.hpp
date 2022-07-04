@@ -15,44 +15,20 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
+#ifndef GLOB_HPP_
+#define GLOB_HPP_
 
-#include <ActionFactory.hpp>
-#include <MockAction.hpp>
+namespace util {
+namespace glob {
 
-std::unique_ptr<clang::ASTConsumer>
-MockAction::CreateASTConsumer(clang::CompilerInstance &CI, llvm::StringRef File)
+static inline bool isPattern(llvm::StringRef Str)
 {
-    (void) CI;
-    (void) File;
+    auto Pred = [](char C) { return C == '?' || C == '*' || C == '['; };
 
-    return nullptr;
+    return std::ranges::any_of(Str, Pred);
 }
 
-bool MockAction::PrepareToExecuteAction(clang::CompilerInstance &CI)
-{
-    (void) CI;
+} /* namespace glob */
+} /* namespace util */
 
-    return true;
-}
-
-void MockAction::EndSourceFileAction()
-{
-}
-
-TEST(ActionFactory, Create)
-{
-    auto Factory = ActionFactory();
-
-    auto Action = Factory.create();
-
-    ASSERT_TRUE(Action);
-}
-
-int main(int argc, char *argv[])
-{
-    testing::InitGoogleTest(&argc, argv);
-
-    return RUN_ALL_TESTS();
-}
+#endif /* GLOB_HPP_ */

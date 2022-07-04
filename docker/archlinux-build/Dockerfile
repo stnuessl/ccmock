@@ -12,10 +12,11 @@ RUN pacman -Syu --noconfirm \
     ctags \
     findutils \
     gcc \
+    gtest \
     lcov \
     llvm \
     make \
-    pkgconfig \
+    pkgconf \
     util-linux \
 && pacman -Scc --noconfirm \
 && useradd \

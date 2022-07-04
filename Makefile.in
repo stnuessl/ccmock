@@ -124,17 +124,17 @@ endif
 #
 # Specify all source files. The paths should be relative to this file.
 #
-reg_src := $(shell find $(srcdir) -iname "*.cpp")
-gen_src := 
-src := $(reg_src) $(gen_src)
+src := \
+${PROJECT_SRC}
+
 
 # 
 # Optional: This variable is used by the 'format' and 'tags' targets 
 # which are not necessary to build the target.
 #
-reg_hdr := $(shell find $(srcdir) -iname "*.hpp")
-gen_hdr := 
-hdr := $(reg_hdr) $(gen_hdr)
+hdr := \
+${PROJECT_HDR}
+
 
 ifndef src
 $(error No source files specified)
@@ -185,23 +185,10 @@ endif
 
 #
 # Define all object and dependency files from $(src) and get
-# a list of all inhabited directories. Special care is taken to prevent 
-# file paths like "build/./src/main.$(OBJ_SUFFIX)"
+# a list of all inhabited directories. 
 #
-
-gen_src_c := $(filter %.c,$(gen_src))
-reg_src_c := $(filter %.c,$(reg_src))
-gen_src_cxx := $(filter %.cpp,$(gen_src))
-reg_src_cxx := $(filter %.cpp,$(reg_src))
-
-release_objs := \
-	$(patsubst $(BUILD_DIR)/%.c,$(release_dir)/%.$(OBJ_SUFFIX),$(gen_src_c)) \
-	$(patsubst $(BUILD_DIR)/%.cpp,$(release_dir)/%.$(OBJ_SUFFIX),$(gen_src_cxx)) \
-	$(patsubst %.c,$(release_dir)/%.$(OBJ_SUFFIX),$(reg_src_c)) \
-	$(patsubst %.cpp,$(release_dir)/%.$(OBJ_SUFFIX),$(reg_src_cxx))
-
-debug_objs := \
-	$(patsubst $(release_dir)/%.$(OBJ_SUFFIX),$(debug_dir)/%.$(OBJ_SUFFIX),$(release_objs))
+release_objs := $(patsubst %.cpp,$(release_dir)/%.$(OBJ_SUFFIX),$(src))
+debug_objs := $(patsubst $(release_dir)/%,$(debug_dir)/%,$(release_objs))
 
 #
 # Paths to default targets.
@@ -299,7 +286,7 @@ endif
 # Variables for shellcheck
 #
 shell_scripts := \
-	$(shell find . -name "*.sh")
+	$(shell find . -name "*.sh" -and -not -path "*/zlib-ng/*")
 # bash-completion/ccmock
 
 ifneq (,$(shell_scripts))
@@ -341,7 +328,12 @@ DEFS := \
 # Add additional include paths
 #
 INC := \
-	-Isrc/
+${PROJECT_INC}
+
+#llvm_includedir := $(shell llvm-config --includedir)
+#ifneq (/usr/include, $(llvm_includedir))
+#INC	+= -isystem $(llvm_includedir)
+#endif
 
 
 #
@@ -355,11 +347,10 @@ pkgconf_libs := \
 #
 LDLIBS := \
 	-lstdc++ \
-	$(shell llvm-config --libs) \
-	-lclang-cpp \
+	-lm \
+${PROJECT_LDLIBS}
 #	-Wl,--start-group \
 #	-Wl,--end-group \
-#	-lstdc++fs \
 #	-lm \
 
 #
@@ -368,9 +359,10 @@ LDLIBS := \
 # as in the CFLAGS / CXXFLAGS
 #
 LDFLAGS := \
+	-fPIC \
+${PROJECT_LDFLAGS}
 #	-Wl,-Map=$@.map \
 #	-Wl,-rpath,/usr/local/lib \
-#	-fPIC \
 #	-fpic \
 #	-shared \
 
@@ -467,13 +459,13 @@ ut_src		:= $(shell find $(ut_srcdir) -name "*.cpp" -printf "%P\n")
 
 ut_objs := \
 	$(patsubst %.cpp,$(ut_bindir)/%.$(OBJ_SUFFIX),$(ut_src)) \
-	$(patsubst %.cpp,$(ut_dir)/%.$(OBJ_SUFFIX),$(reg_src_cxx))
+	$(patsubst %.cpp,$(ut_dir)/%.$(OBJ_SUFFIX),$(src))
 
 #
 # Every unit test source file has its own executable and report file.
 #
 ut_tests	:= $(patsubst %.cpp,$(ut_bindir)/%,$(ut_src))
-ut_reports	:= $(patsubst %,%.txt,$(ut_tests))
+ut_reports	:= $(patsubst %,%.xml,$(ut_tests))
 
 dirs += \
 	$(ut_dir) \
@@ -487,11 +479,11 @@ ifdef clang_cxx
 version_list += "$$(gcc --version)"
 endif
 
-$(ut_tests): CPPFLAGS	+= -DUNIT_TESTS_ENABLED -DMEM_NOLEAK -I$(srcdir)
+$(ut_tests): CPPFLAGS	+= -DUNIT_TESTS_ENABLED -I$(srcdir)
 $(ut_tests): CPPFLAGS	+= $(shell $(PKGCONF) --libs gtest gmock)
 $(ut_tests): CFLAGS		+= -Og -g2 -ftest-coverage -fprofile-arcs
 $(ut_tests): CXXFLAGS	+= -Og -g2 -ftest-coverage -fprofile-arcs
-$(ut_tests): LDLIBS		+= $(shell $(PKGCONF) --libs gtest gmock)
+$(ut_tests): LDLIBS		:= $(shell $(PKGCONF) --libs gtest gmock) $(LDLIBS)
 
 ifneq (,$(shell type -fP lcov))
 ut_info := $(ut_dir)/$(BIN).info
@@ -646,9 +638,9 @@ $(ut_info): $(ut_reports)
 		--rc lcov_branch_coverage=1 \
 		--rc lcov_function_coverage=1
 
-$(ut_bindir)/%.txt: $(ut_bindir)/%
+$(ut_bindir)/%.xml: $(ut_bindir)/%
 	@printf "$(magenta)Executing [ $< ]$(reset)\n"
-	$(Q)./$< | tee $@ || (rm -f $@ && false)
+	$(Q)./$< --gtest_output=xml:$@
 
 $(ut_bindir)/%: \
 	$(ut_bindir)/%.$(OBJ_SUFFIX) $(ut_dir)/$(srcdir)/%.$(OBJ_SUFFIX)
@@ -662,6 +654,9 @@ $(ut_bindir)/%.$(OBJ_SUFFIX): $(ut_srcdir)/%.cpp
 $(ut_dir)/%.$(OBJ_SUFFIX): %.cpp
 	@printf "$(blue)Building [ $@ ]$(reset)\n"
 	$(Q)gcc -c -o $@ $(CPPFLAGS) $(CFLAGS) $<
+
+system-tests: $(release_bin)
+	make --directory test/system
 
 clean:
 	rm -rf $(BUILD_DIR)
@@ -733,6 +728,9 @@ $(shellcheck): $(shellcheck_output)
 $(shellcheck_output): $(shell_scripts) | $(dirs)
 	$(Q)shellcheck $(shellcheck_flags) $^ | tee $@ || (rm -f $@ && false)
 
+configure: Makefile.in
+	@bash ./configure.sh
+
 # Use sed to strip the directories in which the tarball will be created off of
 # all input paths. This is required so the paths don't appear when extracting
 # the tarball.
@@ -785,6 +783,7 @@ endif
 	artifactory-upload \
 	clang-analysis \
 	clean \
+	configure \
 	debug \
 	format \
 	install \

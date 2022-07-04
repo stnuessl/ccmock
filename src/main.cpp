@@ -15,6 +15,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <filesystem>
+
 #include <clang/Frontend/FrontendActions.h>
 #include <clang/Tooling/CommonOptionsParser.h>
 #include <clang/Tooling/JSONCompilationDatabase.h>
@@ -27,18 +29,6 @@
 
 #include "ActionFactory.hpp"
 #include "Config.hpp"
-
-#ifndef CCMOCK_VERSION_MAJOR
-#error Preprocessor macro "CCMOCK_VERSION_MAJOR" not defined.
-#endif
-
-#ifndef CCMOCK_VERSION_MINOR
-#error Preprocessor macro "CCMOCK_VERSION_MINOR" not defined.
-#endif
-
-#ifndef CCMOCK_VERSION_PATCH
-#error Preprocessor macro "CCMOCK_VERSION_PATCH" not defined.
-#endif
 
 #ifndef CCMOCK_VERSION_CORE
 #error Preprocessor macro "CCMOCK_VERSION_CORE" not defined.
@@ -55,6 +45,19 @@ static llvm::cl::opt<std::string> InputFile(
     llvm::cl::ValueRequired,
     llvm::cl::Positional,
     llvm::cl::Optional,
+    llvm::cl::cat(ToolCategory)
+);
+
+static llvm::cl::opt<std::string> BaseDirectory(
+    "base-directory",
+    llvm::cl::desc(
+        "Use directory <base-directory> when emitting relative paths.\n"
+        "Useful as the compiler frontend changes directories according\n"
+        "to the entry in the respective compilation database. Default\n"
+        "value is the current working directory.\n"
+    ),
+    llvm::cl::value_desc("directory"),
+    llvm::cl::ValueOptional,
     llvm::cl::cat(ToolCategory)
 );
 
@@ -248,6 +251,12 @@ __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
     if (llvm::StringRef File = ::getenv("CCMOCK_CONFIG"); !File.empty())
         Config->read(File);
 
+    if (!BaseDirectory.empty())
+        Config->BaseDirectory = std::move(BaseDirectory);
+
+    if (CompileCommandsFile.getNumOccurrences() != 0)
+        Config->CompileCommands = std::move(CompileCommandsFile.getValue());
+
     if (Verbose.getNumOccurrences() != 0)
         Config->Verbose = Verbose;
 
@@ -263,6 +272,10 @@ __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
     if (!OutputFile.empty())
         Config->Output = std::move(OutputFile);
 
+    /*
+     * Dump the config now before adjusting it for program internal reasons
+     * so the users can see their effective configuration settings.
+     */
     if (DumpConfig) {
         if (!Config->Output.empty())
             Config->write(OutputFile);
@@ -270,6 +283,18 @@ __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
             Config->write(llvm::outs());
 
         std::exit(EXIT_SUCCESS);
+    }
+
+    if (Config->BaseDirectory.empty())
+        Config->BaseDirectory = std::filesystem::current_path();
+
+    if (!Config->Output.empty() && Config->Output.is_relative()) {
+        /*
+         * The ClangTool might change the working directory during its
+         * invocation. We therefore use the absolute path for the output file
+         * to make sure it will be created were the user expects it.
+         */
+        Config->Output = std::filesystem::absolute(Config->Output);
     }
 
     switch (Config->UseColor) {
@@ -288,7 +313,7 @@ __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
     auto Factory = ActionFactory();
     Factory.setConfig(Config);
 
-    auto Commands = loadCompileCommands(CompileCommandsFile, Message);
+    auto Commands = loadCompileCommands(Config->CompileCommands, Message);
     if (!Commands) {
         llvm::errs() << util::cl::error() << Message << "\n";
 

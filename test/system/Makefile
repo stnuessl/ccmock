@@ -22,61 +22,21 @@
 # THE SOFTWARE.
 #
 
-SHELL	:= bash -o pipefail
-CC		:= clang
-CXX		:= clang
-LD		:= clang
+all: basic zlib-ng
 
-src		:= $(shell find src -name "*.c")
-obj		:= $(patsubst %.c,%.o,$(src))
-ut_src	:= $(shell find test -name "*.cpp")
-ut_obj	:= $(patsubst %.cpp,%.o,$(ut_src))
-ut_gen	:= $(patsubst src/%.c,test/%.inc,$(src))
-ut_bin	:= $(patsubst %.cpp,%.out,$(ut_src))
-ut_out	:= $(patsubst %.cpp,%.xml,$(ut_src))
+basic: basic/Makefile
+	make --directory $@
 
-CPPFLAGS	:= $(shell pkg-config --cflags gmock gtest)
-CFLAGS		:=
-CXXFLAGS	:= -std=c++11
-LDLIBS		:= -lstdc++ $(shell pkg-config --libs gmock gtest)
-
-#
-# Disable all implicit rules
-#
-.SUFFIXES:
-
-#
-# Prevent make from automatically removing
-# intermediate files when invoking "all".
-#
-.SECONDARY:
-
-
-all: tests
-
-tests: $(ut_out)
-
-%.xml: %.out
-	./$< --gtest_output=xml:$@
-
-test/%.out: test/%.o src/%.o
-	$(LD) -o $@ $(CXXFLAGS) $(LDFLAGS) $(LDLIBS) $^
-
-src/%.o: src/%.c
-	$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $<
-
-test/%.o: test/%.cpp test/%.inc
-	$(CXX) -c -o $@ -Isrc $(CPPFLAGS) $(CXXFLAGS) $<
-
-test/%.inc: src/%.c
-	./../../../build/release/ccmock -o $@ --config=test/ccmock.yaml $<
+zlib-ng: zlib-ng/Makefile
+	make --directory $@
 
 clean:
-	rm -f $(obj) $(ut_obj) $(ut_bin) $(ut_out) $(ut_gen)
+	make --directory basic clean
+	make --directory zlib-ng clean
+
 
 .PHONY: \
 	all \
-	tests \
-	clean
-
-
+	clean \
+	basic \
+	zlib-ng
