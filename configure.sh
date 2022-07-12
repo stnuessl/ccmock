@@ -26,15 +26,9 @@
 set -o pipefail
 
 #
-# Automatically detect source and header files
-#
-PROJECT_SRC="$(find src/ -name "*.cpp" -printf "\t%p \\\\\n")"
-PROJECT_HDR="$(find src/ -name "*.hpp" -printf "\t%p \\\\\n")"
-
-#
 # Define include paths
 #
-PROJECT_INC="-Isrc/"
+INC=("-Isrc/")
 
 INCLUDE_DIR="$(llvm-config --includedir)"
 
@@ -42,21 +36,22 @@ if [[ "/usr/include" != "${INCLUDE_DIR}" ]]; then
     
     # Add as "-isystem" to avoid generation of potential i
     # compiler warnings in library headers.
-    PROJECT_INC="${PROJECT_INC} '-isystem ${INCLUDE_DIR}'"
+    INC+=("-isystem ${INCLUDE_DIR}")
 fi
 
 #
 # libclang-cpp.so seems to be more special as not every distribution seems
 # to provide the symlink.
 #
-PROJECT_LDLIBS="$(llvm-config --libs)"
+LDLIBS=("$(llvm-config --libs)")
+
 LIBDIR="$(llvm-config --libdir)"
 VERSION="$(llvm-config --version | sed -n 's/\([0-9]\+\).*$/\1/p')"
 
 if [[ -f "${LIBDIR}/libclang-cpp.so" ]]; then
-    PROJECT_LDLIBS="${PROJECT_LDLIBS} -lclang-cpp"
+    LDLIBS+=("-lclang-cpp")
 elif [[ -f "${LIBDIR}/libclang-cpp.so.${VERSION}" ]]; then
-    PROJECT_LDLIBS="${PROJECT_LDLIBS} -l:libclang-cpp.so.${VERSION}"
+    LDLIBS+=("-l:libclang-cpp.so.${VERSION}")
 else
     echo "error: libclang-cpp.so: failed to detect shared library"
     exit 1;
@@ -67,47 +62,50 @@ fi
 # Add additional linker flags required to find shared libraries
 #
 if [[ ${LIBDIR} != '/usr/lib' ]]; then
-    PROJECT_LDFLAGS="-L${LIBDIR}"
+    LDFLAGS=("-L${LIBDIR}")
 else
-    PROJECT_LDFLAGS=""
+    LDFLAGS=("")
 fi
 
 #
 # Do the configuration for the unit tests
 #
 
-PROJECT_UT_SRC="$(find test/unit -name "*.cpp" -printf "\t%P \\\\\n")"
-
-if [[ -z "${PROJECT_UT_SRC}" ]]; then
+UT_SRC="$(find test/unit -name "*.cpp" -printf "\t%P \\\\\n")"
+if [[ -z "${UT_SRC}" ]]; then
+    PROJECT_UT_ENABLE="no"
     echo "warning: unit tests: failed to detect sources"
 elif ! pkgconf --exists --print-errors gtest gmock; then
+    PROJECT_UT_ENABLE="no"
     echo "warning: unit tests: failed to detect gtest and gmock"
 else
     PROJECT_UT_ENABLE="yes"
-    PROJECT_UT_CPPFLAGS="$(pkgconf --cflags gtest gmock)"
-    PROJECT_UT_LDLIBS="$(pkgconf --libs gtest gmock)"
+    read -r -a UT_CPPFLAGS < <(pkgconf --cflags gtest gmock || true)
+    read -r -a UT_LDLIBS < <(pkgconf --libs gtest gmock || true)
 fi
 
 
 if ! type -fP lcov > /dev/null; then
+    PROJECT_UT_COVERAGE_ENABLE="no"
     echo "warning: unit tests: failed to detect \"lcov\""
 else
     PROJECT_UT_COVERAGE_ENABLE="yes"
 fi
 
-#
-# Ensure that arguments are nicely formatted
-#
-function make_format() {
-    # shellcheck disable=SC2086
-    printf "\t%s \\\\\n" $1
+function print() {
+    printf "\t%s \\\\\n" "$@"
 }
 
-PROJECT_INC="$(make_format "${PROJECT_INC}")"
-PROJECT_LDLIBS="$(make_format "${PROJECT_LDLIBS}")"
-PROJECT_LDFLAGS="$(make_format "${PROJECT_LDFLAGS}")"
-PROJECT_UT_CPPFLAGS="$(make_format "${PROJECT_UT_CPPFLAGS}")"
-PROJECT_UT_LDLIBS="$(make_format "${PROJECT_UT_LDLIBS}")"
+
+PROJECT_SRC="$(find src/ -name "*.cpp" -printf "\t%p \\\\\n")"
+PROJECT_HDR="$(find src/ -name "*.hpp" -printf "\t%p \\\\\n")"
+PROJECT_INC="$(print "${INC[@]}")"
+PROJECT_LDLIBS="$(print "${LDLIBS[@]}")"
+PROJECT_LDFLAGS="$(print "${LDFLAGS[@]}")"
+PROJECT_UT_SRC="${UT_SRC}"
+PROJECT_UT_CPPFLAGS="$(print "${UT_CPPFLAGS[@]}")"
+PROJECT_UT_LDLIBS="$(print "${UT_LDLIBS[@]}")"
+
 
 #
 # Define appropriate environment variables for envsubst
@@ -122,6 +120,7 @@ export PROJECT_UT_SRC
 export PROJECT_UT_CPPFLAGS
 export PROJECT_UT_LDLIBS
 export PROJECT_UT_COVERAGE_ENABLE
+
 
 #
 # Generate the project's Makefile

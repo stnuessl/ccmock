@@ -327,11 +327,6 @@ DEFS := \
 INC := \
 ${PROJECT_INC}
 
-#llvm_includedir := $(shell llvm-config --includedir)
-#ifneq (/usr/include, $(llvm_includedir))
-#INC	+= -isystem $(llvm_includedir)
-#endif
-
 
 #
 # Add used libraries which are configurable with pkg-config
@@ -480,6 +475,8 @@ endif
 ut_preprocess_flags := \
 ${PROJECT_UT_CPPFLAGS}
 	-DUNIT_TESTS_ENABLED \
+	$(DEFS) \
+	$(INC) \
 	-I$(srcdir)
 
 ut_compile_flags := \
