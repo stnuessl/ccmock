@@ -47,8 +47,8 @@ Required Programs
 -----------------
 
 * `bash <https://www.gnu.org/software/bash/bash.html>`_
-* `gcc 12.1.0 <https://gcc.gnu.org/>`_  
-* `clang 14.0.0 <https://clang.llvm.org/>`_
+* `gcc <https://gcc.gnu.org/>`_ 12.1.0
+* `clang <https://clang.llvm.org/>`_ 14.0.0
 * `git <https://git-scm.com/>`_
 * `make <https://www.gnu.org/software/make/>`_
 * `util-linux <https://github.com/util-linux/util-linux>`_
@@ -57,8 +57,8 @@ Required Programs
 Dependencies
 ------------
 
-* `llvm >= 14.0.0 <https://llvm.org/>`_
-* `clang >= 14.0.0 <https://clang.llvm.org/>`_
+* `llvm <https://llvm.org/>`_ >= 14.0.0
+* `clang <https://clang.llvm.org/>`_ >= 14.0.0
 
 
 Procedure
@@ -106,34 +106,91 @@ Install the built program to */usr/local/bin*:
 Usage
 =====
 
+General Idea
+------------
+
+#. Generate a compilation database *compile_commands.json* for your project.
+#. Feed the source file and the compilation database into **ccmock** to create
+   mocks for your unit test code.
+
+   ``ccmock --compile-commands=compile_commands.json -o <output> <input>``
+
+#. Use the preprocessor to include the generated output file in your unit test 
+   source file.
+#. Focus on writing unit test code.
+   
+
 Examples
 --------
 
-Write generated mocks for *source.c* to *source-mocks.hpp*.
+Get Help Message
+^^^^^^^^^^^^^^^^
 
 .. code:: sh
 
-   ccmock -o source-mocks.inc source.c
-
-Write generated mocks to stdout.
+   ccmock
 
 .. code:: sh
 
-   ccmock source.cpp 
-
-Usually _ccmock_ will need additional information to be able to parse the
-input file. Use **ccmock** with a compilation database:
+   ccmock --help
 
 .. code:: sh
 
-   ccmock --compile-commands=compile_commands.json source.cpp
+   ccmock -h
 
-Use _ccmock_ with configuration files:
+
+Write Mock Function to Standard Output
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code:: sh
 
-   ccmock --config=ccmock.yaml,source.yaml source.cpp
+   ccmock <input-file>
 
+
+Write Mock Function to File
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code:: sh
+
+   ccmock -o <output-file> <input-file>
+
+
+Using Compile Flags
+^^^^^^^^^^^^^^^^^^^
+
+.. code:: sh
+
+   ccmock --compile-commands=compile_flags.txt <input-file>
+ 
+
+Using a Compilation Database
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code:: sh
+
+   ccmock --compile-commands=compile_commands.json <input-file>
+
+Specifying Configuration Files
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code:: sh
+
+   ccmock --config=<config>.yaml
+
+.. code:: sh
+
+   ccmock --config=<config>.yaml,<config>.yaml <input-file>
+
+Dump Effective Configuration Settings
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code:: sh
+
+   ccmock --dump-config
+
+.. code:: sh
+
+   ccmock --dump-config -o <output-file>
 
 Open Points
 ===========
