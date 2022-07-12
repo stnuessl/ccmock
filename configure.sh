@@ -72,14 +72,42 @@ else
     PROJECT_LDFLAGS=""
 fi
 
+#
+# Do the configuration for the unit tests
+#
+
+PROJECT_UT_SRC="$(find test/unit -name "*.cpp" -printf "\t%P \\\\\n")"
+
+if [[ -z "${PROJECT_UT_SRC}" ]]; then
+    echo "warning: unit tests: failed to detect sources"
+elif ! pkgconf --exists --print-errors gtest gmock; then
+    echo "warning: unit tests: failed to detect gtest and gmock"
+else
+    PROJECT_UT_ENABLE="yes"
+    PROJECT_UT_CPPFLAGS="$(pkgconf --cflags gtest gmock)"
+    PROJECT_UT_LDLIBS="$(pkgconf --libs gtest gmock)"
+fi
+
+
+if ! type -fP lcov > /dev/null; then
+    echo "warning: unit tests: failed to detect \"lcov\""
+else
+    PROJECT_UT_COVERAGE_ENABLE="yes"
+fi
 
 #
 # Ensure that arguments are nicely formatted
 #
-PROJECT_INC="$(echo "${PROJECT_INC}" | xargs printf "\t%s \\\\\n")"
-PROJECT_LDLIBS="$(echo "${PROJECT_LDLIBS}" | xargs printf "\t%s \\\\\n")"
-PROJECT_LDFLAGS="$(echo "${PROJECT_LDFLAGS}" | xargs printf "\t%s \\\\\n")"
+function make_format() {
+    # shellcheck disable=SC2086
+    printf "\t%s \\\\\n" $1
+}
 
+PROJECT_INC="$(make_format "${PROJECT_INC}")"
+PROJECT_LDLIBS="$(make_format "${PROJECT_LDLIBS}")"
+PROJECT_LDFLAGS="$(make_format "${PROJECT_LDFLAGS}")"
+PROJECT_UT_CPPFLAGS="$(make_format "${PROJECT_UT_CPPFLAGS}")"
+PROJECT_UT_LDLIBS="$(make_format "${PROJECT_UT_LDLIBS}")"
 
 #
 # Define appropriate environment variables for envsubst
@@ -89,6 +117,11 @@ export PROJECT_HDR
 export PROJECT_INC
 export PROJECT_LDLIBS
 export PROJECT_LDFLAGS
+export PROJECT_UT_ENABLE
+export PROJECT_UT_SRC
+export PROJECT_UT_CPPFLAGS
+export PROJECT_UT_LDLIBS
+export PROJECT_UT_COVERAGE_ENABLE
 
 #
 # Generate the project's Makefile

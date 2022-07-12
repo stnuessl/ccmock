@@ -317,9 +317,6 @@ DEFS := \
 	-D__STDC_CONSTANT_MACROS \
 	-D__STDC_FORMAT_MACROS \
 	-D__STDC_LIMIT_MACROS \
-	-DCCMOCK_VERSION_MAJOR=\"$(version_major)\" \
-	-DCCMOCK_VERSION_MINOR=\"$(version_minor)\" \
-	-DCCMOCK_VERSION_PATCH=\"$(version_patch)\" \
 	-DCCMOCK_VERSION_CORE=\"$(version_core)\" \
 	-DCCMOCK_WEBSITE=\"https://github.com/stnuessl/ccmock\" \
 	-DCOPYRIGHT_YEAR=\"$(shell date --date "@$(UNIX_TIME)" +"%Y")\"
@@ -450,12 +447,13 @@ LDFLAGS		+= $(EXTRA_LDFLAGS)
 #
 # Define unit test targets
 #
-ifeq (,$(shell $(PKGCONF) --print-errors --exists gtest gmock 2>&1))
+ifeq (yes,${PROJECT_UT_ENABLE})
 ut_target	:= unit-tests
 ut_srcdir	:= test/unit
 ut_dir		:= $(BUILD_DIR)/unit-tests
 ut_bindir	:= $(ut_dir)/tests
-ut_src		:= $(shell find $(ut_srcdir) -name "*.cpp" -printf "%P\n")
+ut_src		:= \
+	${PROJECT_UT_SRC}
 
 ut_objs := \
 	$(patsubst %.cpp,$(ut_bindir)/%.$(OBJ_SUFFIX),$(ut_src)) \
@@ -479,13 +477,28 @@ ifdef clang_cxx
 version_list += "$$(gcc --version)"
 endif
 
-$(ut_tests): CPPFLAGS	+= -DUNIT_TESTS_ENABLED -I$(srcdir)
-$(ut_tests): CPPFLAGS	+= $(shell $(PKGCONF) --libs gtest gmock)
-$(ut_tests): CFLAGS		+= -Og -g2 -ftest-coverage -fprofile-arcs
-$(ut_tests): CXXFLAGS	+= -Og -g2 -ftest-coverage -fprofile-arcs
-$(ut_tests): LDLIBS		:= $(shell $(PKGCONF) --libs gtest gmock) $(LDLIBS)
+ut_preprocess_flags := \
+${PROJECT_UT_CPPFLAGS}
+	-DUNIT_TESTS_ENABLED \
+	-I$(srcdir)
 
-ifneq (,$(shell type -fP lcov))
+ut_compile_flags := \
+	-Og \
+	-g2 \
+	-ftest-coverage \
+	-fprofile-arcs
+
+ut_library_flags := \
+${PROJECT_UT_LDLIBS}
+	$(LDLIBS)
+
+$(ut_tests): CPPFLAGS	:= $(ut_preprocess_flags)
+$(ut_tests): CFLAGS		:= $(CFLAGS) $(ut_compile_flags)
+$(ut_tests): CXXFLAGS	:= $(CXXFLAGS) $(ut_compile_flags)
+$(ut_tests): LDLIBS		:= $(ut_library_flags)
+
+
+ifeq (yes,${PROJECT_UT_COVERAGE_ENABLE})
 ut_info := $(ut_dir)/$(BIN).info
 ut_cov := $(ut_dir)/coverage
 
@@ -495,7 +508,6 @@ $(ut_tests): LDLIBS		+= -lgcov
 
 endif
 endif
-
 
 
 #
