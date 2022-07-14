@@ -27,7 +27,6 @@
 #include "GMockGenerator.hpp"
 
 #include "util/Decl.hpp"
-#include "util/Path.hpp"
 #include "util/Type.hpp"
 #include "util/commandline.hpp"
 
@@ -61,7 +60,7 @@ void GMockGenerator::HandleTranslationUnit(clang::ASTContext &Context)
             GlobalFunctionDeclVec.push_back(Item);
     }
 
-    writeCommentHeader(Context);
+    writeCommentHeader();
     writeIncludeStatements();
     writeGlobalFunctionMocks(GlobalFunctionDeclVec);
     writeClassMethodMocks();
@@ -74,27 +73,25 @@ void GMockGenerator::dumpMocks()
 {
     std::error_code error;
 
-    if (Config_->Output.empty()) {
+    if (Config_->General.Output.empty()) {
         llvm::outs() << Buffer_ << "\n";
         return;
     }
 
-    auto outs = llvm::raw_fd_stream(Config_->Output.native(), error);
+    auto outs = llvm::raw_fd_stream(Config_->General.Output.native(), error);
     if (error) {
-        llvm::errs() << util::cl::error() << "failed to open \""
-                     << Config_->Output << "\": " << error.message() << "\n";
+        llvm::errs() << util::cl::error() 
+                     << "failed to open \""
+                     << Config_->General.Output.native() 
+                     << "\": " << error.message() << "\n";
         std::exit(EXIT_FAILURE);
     }
 
     outs << Buffer_ << "\n";
 }
 
-void GMockGenerator::writeCommentHeader(const clang::ASTContext &Context)
+void GMockGenerator::writeCommentHeader()
 {
-    auto &SourceManager = Context.getSourceManager();
-    auto FileID = SourceManager.getMainFileID();
-    auto Entry = SourceManager.getFileEntryForID(FileID);
-
     /* clang-format off */
     Out_ << 
 "/*\n"
@@ -102,7 +99,7 @@ void GMockGenerator::writeCommentHeader(const clang::ASTContext &Context)
 " * Information about ccmock is available at " CCMOCK_WEBSITE ".\n"
 " *\n";
 
-    if (Config_->WriteDate) {
+    if (Config_->General.WriteDate) {
         /* Looks like I do not understand std::chrono... */
         char buf[64];
         struct tm tm;
@@ -116,9 +113,9 @@ void GMockGenerator::writeCommentHeader(const clang::ASTContext &Context)
 " *     Date        : " << buf << "\n";
     }
 
-    auto &Base = Config_->BaseDirectory;
-    auto Input = util::path::make_relative(Entry->getName(), Base);
-    auto Output = util::path::make_relative(Config_->Output.native(), Base);
+    auto &Base = Config_->General.BaseDirectory;
+    auto Input = std::filesystem::relative(Config_->General.Input, Base);
+    auto Output = std::filesystem::relative(Config_->General.Output, Base);
     
     if (Output.empty())
         Output = "-";
@@ -156,24 +153,11 @@ void GMockGenerator::writeGlobalFunctionMocks(
     if (Vec.empty())
         return;
 
-    Out_ << "class " << Config_->MockName
+    Out_ << "class " << Config_->GMock.MockName
          << " {\n"
             "public:\n";
 
     for (const auto FunctionDecl : Vec) {
-        if (FunctionDecl->isVariadic()) {
-            if (Config_->Strict) {
-                llvm::errs()
-                    << util::cl::error() << "encounterd variadic function \""
-                    << *FunctionDecl << "\"\n";
-                std::exit(EXIT_FAILURE);
-            }
-
-            llvm::errs() << util::cl::warning()
-                         << "skipping variadic function \"" << *FunctionDecl
-                         << "\"\n";
-            continue;
-        }
         /*
          * TODO: Solution if multiple functions with same name in different
          * namespaces exists.
@@ -193,15 +177,16 @@ void GMockGenerator::writeGlobalFunctionMocks(
     Out_ << "};\n\n";
 
     auto MockType = llvm::StringRef("StrictMock");
-    if (!Config_->MockType.empty())
-        MockType = Config_->MockType;
+    if (!Config_->GMock.MockType.empty())
+        MockType = Config_->GMock.MockType;
 
     /*
      * Example output:
      *      static testing::StrictMock<MockName> MockName;
      */
-    Out_ << "static testing::" << MockType << "<" << Config_->MockName << "> "
-         << Config_->MockName << ";\n\n";
+    Out_ << "static testing::" << MockType 
+         << "<" << Config_->GMock.MockName << "> "
+         << Config_->GMock.MockName << ";\n\n";
 
     /* Write the mock function definitions */
     for (const auto FunctionDecl : Vec) {
@@ -228,7 +213,7 @@ void GMockGenerator::writeClassMethodMocks()
 
 void GMockGenerator::writeMainFunctionDefinition()
 {
-    if (!Config_->WriteMain)
+    if (!Config_->GMock.WriteMain)
         return;
 
     /* clang-format off */
@@ -349,7 +334,7 @@ void GMockGenerator::writeFunctionBody(const clang::FunctionDecl *Decl)
     if (!Decl->getReturnType()->isVoidType())
         Out_ << "return ";
 
-    Out_ << Config_->MockName << "." << *Decl << "(";
+    Out_ << Config_->GMock.MockName << "." << *Decl << "(";
 
     for (unsigned int i = 0, Size = Parameters.size(); i < Size; ++i) {
         if (i != 0)

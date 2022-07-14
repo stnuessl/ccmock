@@ -76,7 +76,7 @@ bool MockAction::PrepareToExecuteAction(clang::CompilerInstance &CI)
      * version should not matter.
      */
 
-    auto Path = Config_->ClangResourceDirectory;
+    auto Path = Config_->Clang.ResourceDirectory.string();
 
     if (Path.empty()) {
         Path = DetectClangResourceDirectory();

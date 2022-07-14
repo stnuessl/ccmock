@@ -23,6 +23,7 @@ namespace llvm {
 namespace yaml {
 
 template <> struct ScalarTraits<std::filesystem::path> {
+public:
     static void
     output(const std::filesystem::path &Value, void *, llvm::raw_ostream &Out)
     {
@@ -44,6 +45,7 @@ template <> struct ScalarTraits<std::filesystem::path> {
 };
 
 template <> struct ScalarEnumerationTraits<Config::UseColorType> {
+public:
     static void enumeration(IO &io, Config::UseColorType &Value)
     {
         io.enumCase(Value, "auto", Config::UseColorType::AUTO);
@@ -52,66 +54,175 @@ template <> struct ScalarEnumerationTraits<Config::UseColorType> {
     }
 };
 
-template <> struct MappingTraits<Config> {
+template <> struct MappingTraits<Config::ClangSection> {
 public:
-    static void mapping(llvm::yaml::IO &IO, Config &Config)
+    static void mapping(llvm::yaml::IO &IO, Config::ClangSection &Section)
     {
-        IO.mapOptional("Blacklist", Config.Blacklist);
-        IO.mapOptional("BaseDirectory", Config.BaseDirectory);
-        IO.mapOptional("UseColor", Config.UseColor);
-        IO.mapOptional("CompileCommands", Config.CompileCommands);
-        IO.mapOptional("ClangResourceDirectory", Config.ClangResourceDirectory);
-        IO.mapOptional("MockStandardLibrary", Config.MockStandardLibrary);
-        IO.mapOptional("MockBuiltins", Config.MockBuiltins);
-        IO.mapOptional("MockType", Config.MockType);
-        IO.mapOptional("MockName", Config.MockName);
-        IO.mapOptional("MockSuffix", Config.MockSuffix);
-        IO.mapOptional("Output", Config.Output);
-        IO.mapOptional("Strict", Config.Strict);
-        IO.mapOptional("WriteDate", Config.WriteDate);
-        IO.mapOptional("WriteMain", Config.WriteMain);
-        IO.mapOptional("Verbose", Config.Verbose);
-        IO.mapOptional("Force", Config.Force);
-        IO.mapOptional("Quiet", Config.Quiet);
+        IO.mapOptional("ResourceDirectory", Section.ResourceDirectory);
+    }
+    
+    static std::string validate(llvm::yaml::IO &IO, Config::ClangSection &Section)
+    {
+        std::string Message;
+        llvm::raw_string_ostream OS(Message);
+        std::error_code Error;
+
+        (void) IO;
+
+        if (std::filesystem::is_directory(Section.ResourceDirectory, Error))
+            return "";
+
+        OS << "Clang.ResourceDirectory: ";
+        if (Error) {
+            OS << Error.message();
+            return Message;
+        }
+
+        OS << "\"" << Section.ResourceDirectory.native() 
+           << "\" is not a directory";
+
+        return Message;
+    }
+};
+
+template <> struct MappingTraits<Config::GMockSection> {
+public:
+    static void mapping(llvm::yaml::IO &IO, Config::GMockSection &Section)
+    {
+        IO.mapOptional("MockType", Section.MockType);
+        IO.mapOptional("MockName", Section.MockName);
+        IO.mapOptional("MockSuffix", Section.MockSuffix);
+        IO.mapOptional("WriteMain", Section.WriteMain);
     }
 
-    static std::string validate(llvm::yaml::IO &IO, Config &Config)
+    static std::string validate(llvm::yaml::IO &IO, Config::GMockSection &Section)
     {
         (void) IO;
 
-        if (Config.MockType == "NaggyMock")
+        if (Section.MockType == "NaggyMock")
             return "";
 
-        if (Config.MockType == "NiceMock")
+        if (Section.MockType == "NiceMock")
             return "";
 
-        if (Config.MockType == "StrictMock")
+        if (Section.MockType == "StrictMock")
             return "";
 
         return "\"MockType\": invalid value";
     }
 };
 
+template <> struct MappingTraits<Config::GeneralSection> {
+public:
+    static void mapping(llvm::yaml::IO &IO, Config::GeneralSection &Section)
+    {
+        IO.mapOptional("BaseDirectory", Section.BaseDirectory);
+        IO.mapOptional("CompileCommands", Section.CompileCommands);
+        IO.mapOptional("Input", Section.Input);
+        IO.mapOptional("Output", Section.Output);
+
+        IO.mapOptional("UseColor", Section.UseColor);
+
+        IO.mapOptional("Quiet", Section.Quiet);
+        IO.mapOptional("Verbose", Section.Verbose);
+        IO.mapOptional("WriteDate", Section.WriteDate);
+    }
+
+    static std::string validate(llvm::yaml::IO &IO, Config::GeneralSection &Section)
+    {
+        llvm::ArrayRef<const std::filesystem::path *> List = {
+            &Section.CompileCommands,
+            &Section.Input,
+            &Section.Output,
+        };
+        std::string Message;
+        llvm::raw_string_ostream OS(Message);
+        std::error_code Error;
+
+        (void) IO;
+
+        for (auto File : List) {
+            if (File->empty())
+                continue;
+
+            if (!std::filesystem::is_directory(*File, Error))
+                continue;
+
+
+            if (Error) {
+                OS << File->native() << ": " << Error.message();
+
+                return Message;
+            }
+
+            OS << File->native() << ": is a directory";
+
+            return Message;
+        }
+        return "";
+    }
+};
+
+template <> struct MappingTraits<Config::MockingSection> {
+public:
+    static void mapping(llvm::yaml::IO &IO, Config::MockingSection &Section)
+    {
+        IO.mapOptional("Blacklist", Section.Blacklist);
+        IO.mapOptional("MockBuiltins", Section.MockBuiltins);
+        IO.mapOptional("MockStdlib", Section.MockStdlib);
+    }
+};
+
+template <> struct MappingTraits<Config> {
+public:
+    static void mapping(llvm::yaml::IO &IO, Config &Config)
+    {
+        IO.mapOptional("Clang", Config.Clang);
+        IO.mapOptional("GMock", Config.GMock);
+        IO.mapOptional("General", Config.General);
+        IO.mapOptional("Mocking", Config.Mocking);
+    }
+};
+
 } // namespace yaml
 } // namespace llvm
 
-Config::Config()
-    : Blacklist(),
-      BaseDirectory(),
-      ClangResourceDirectory(),
-      MockType("StrictMock"),
+Config::ClangSection::ClangSection()
+    : ResourceDirectory()
+{
+}
+
+Config::GMockSection::GMockSection()
+    : MockType("StrictMock"),
       MockName("mock"),
       MockSuffix("_mock"),
+      WriteMain(true)
+{
+}
+
+Config::GeneralSection::GeneralSection()
+    : BaseDirectory(),
+      CompileCommands(),
       Output(),
-      MockBuiltins(false),
-      MockStandardLibrary(false),
-      WriteDate(true),
-      Strict(false),
-      Verbose(false),
-      Force(false),
+      UseColor(Config::UseColorType::AUTO),
       Quiet(false),
-      WriteMain(true),
-      UseColor(Config::UseColorType::AUTO)
+      Verbose(false),
+      WriteDate(false)
+{
+}
+
+Config::MockingSection::MockingSection()
+    : Blacklist(),
+      MockBuiltins(false),
+      MockStdlib(false)
+{
+}
+
+Config::Config()
+    : Clang(),
+      GMock(),
+      General(),
+      Mocking()
 {
 }
 
@@ -155,3 +266,5 @@ void Config::write(llvm::raw_ostream &OS)
 
     YamlOutput << *this;
 }
+
+

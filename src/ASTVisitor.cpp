@@ -40,22 +40,22 @@ void ASTVisitor::setConfig(std::shared_ptr<const Config> Config)
 {
     Config_ = std::move(Config);
 
-    for (const auto &Name : Config_->Blacklist) {
-        if (util::glob::isPattern(Name)) {
-            auto ExpectedGlob = llvm::GlobPattern::create(Name);
-
-            if (!ExpectedGlob) {
-                llvm::errs() << util::cl::error() 
-                             << ExpectedGlob.takeError() 
-                             << "\n";
-
-                std::exit(EXIT_FAILURE);
-            }
-
-            GlobBlacklist_.push_back({ Name, std::move(*ExpectedGlob) });
-        } else {
+    for (const auto &Name : Config_->Mocking.Blacklist) {
+        if (!util::glob::isPattern(Name)) {
             Blacklist_.insert(Name);
+            continue;
         }
+
+        auto ExpectedGlob = llvm::GlobPattern::create(Name);
+        if (!ExpectedGlob) {
+            llvm::errs() << util::cl::error() 
+                         << ExpectedGlob.takeError() 
+                         << "\n";
+
+            std::exit(EXIT_FAILURE);
+        }
+
+        GlobBlacklist_.push_back({ Name, std::move(*ExpectedGlob) });
     }
 }
 
@@ -106,14 +106,14 @@ void ASTVisitor::dispatch(const clang::FunctionDecl *Decl)
     if (Decl->isInStdNamespace())
         return;
 
-    if (Decl->getBuiltinID() != 0u && !Config_->MockBuiltins)
+    if (Decl->getBuiltinID() && !Config_->Mocking.MockBuiltins)
         return;
 
     Buffer_.clear();
     Decl->printQualifiedName(OS);
 
     if (Blacklist_.count(Buffer_)) {
-        if (Config_->Verbose) {
+        if (Config_->General.Verbose) {
             llvm::errs() << util::cl::info() << Buffer_
                          << ": skipping function due to blacklist entry\n";
         }
@@ -122,7 +122,7 @@ void ASTVisitor::dispatch(const clang::FunctionDecl *Decl)
 
     for (const auto &[Pattern, Glob] : GlobBlacklist_) {
         if (Glob.match(Buffer_)) {
-            if (Config_->Verbose) {
+            if (Config_->General.Verbose) {
                 llvm::errs() << util::cl::info() << Buffer_
                              << ": skipping function due to blacklist entry \""
                              << Pattern << "\"\n";
@@ -133,34 +133,24 @@ void ASTVisitor::dispatch(const clang::FunctionDecl *Decl)
     }
 
     if (Decl->isVariadic()) {
-        /* TODO: raise to error if "--strict" */
-        llvm::errs() << util::cl::warning()
+        llvm::errs() << util::cl::error()
                      << "cannot process variadic function \"" << *Decl
-                     << "\"\n";
-        if (Config_->Strict) {
-            std::exit(EXIT_FAILURE);
-        }
+                     << "\" - use a blacklist entry to avoid this error\n";
+        std::exit(EXIT_FAILURE);
     }
 
     auto ID = Decl->getID();
 
-    if (FunctionDeclMap_.count(ID) != 0)
+    if (FunctionDeclMap_.count(ID))
         return;
 
     auto [it, ok] = FunctionDeclMap_.insert({ID, Decl});
     if (!ok) {
+        llvm::errs() << util::cl::error() << ": ";
         Decl->printQualifiedName(llvm::errs());
-        llvm::errs() << ": ";
 
-        if (Config_->Strict)
-            llvm::errs() << util::cl::error();
-        else
-            llvm::errs() << util::cl::warning();
-
-        llvm::errs() << "failed to mark function for further processing\n";
-
-        if (Config_->Strict)
-            std::exit(EXIT_FAILURE);
+        llvm::errs() << ": failed to save function for further processing\n";
+        std::exit(EXIT_FAILURE);
     }
 }
 

@@ -102,11 +102,10 @@ $(srcdir)/%.o: $(srcdir)/%.c $(BUILD_DIR)/compile_commands.json
 
 $(src): $(srcdir)
 
-$(testdir)/%.inc: $(srcdir)/%.c $(BUILD_DIR)/compile_commands.json ccmock.yaml
+$(testdir)/%.inc: $(srcdir)/%.c $(BUILD_DIR)/compile_commands.json
 	@printf "  %-6s %s\n" "MOCK" "$@"
 	$(Q)$(CCMOCK) \
 		-o $@ \
-		--config=ccmock.yaml \
 		--compile-commands=$(BUILD_DIR)/compile_commands.json \
 		$<
 

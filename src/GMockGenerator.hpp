@@ -39,7 +39,7 @@ public:
     void dumpMocks();
 
 private:
-    void writeCommentHeader(const clang::ASTContext &Context);
+    void writeCommentHeader();
     void writeIncludeStatements();
     void writeGlobalFunctionMocks(
         const std::vector<const clang::FunctionDecl *> &Vec);

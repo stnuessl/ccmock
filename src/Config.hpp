@@ -33,32 +33,59 @@ public:
         ALWAYS,
     };
 
+    struct ClangSection {
+    public:
+        ClangSection();
+
+        std::filesystem::path ResourceDirectory;
+    };
+
+    struct GeneralSection {
+    public:
+        GeneralSection();
+
+        std::filesystem::path BaseDirectory;
+        std::filesystem::path CompileCommands;
+        std::filesystem::path Input;
+        std::filesystem::path Output;
+        
+        enum UseColorType UseColor;
+
+        bool Quiet;
+        bool Verbose;
+        bool WriteDate;
+    };
+
+    struct GMockSection {
+    public:
+        GMockSection();
+
+        std::string MockType;
+        std::string MockName;
+        std::string MockSuffix;
+        bool WriteMain;
+    };
+
+    struct MockingSection {
+    public:
+        MockingSection();
+        
+        std::vector<std::string> Blacklist;
+
+        bool MockBuiltins;
+        bool MockStdlib;
+    };
+
     Config();
 
     void read(llvm::StringRef Path);
     void write(llvm::StringRef Path);
     void write(llvm::raw_ostream &OS);
-
-    std::vector<std::string> Blacklist;
-    std::filesystem::path BaseDirectory;
-    std::string CompileCommands;
-    std::string ClangResourceDirectory;
-    std::string MockType;
-    std::string MockName;
-    std::string MockSuffix;
-    std::filesystem::path Output;
-    bool MockBuiltins;
-    bool MockStandardLibrary;
-    bool WriteDate;
-    bool Strict;
-    bool Verbose;
-    bool Force;
-    bool Quiet;
-    bool WriteMain;
-    enum UseColorType UseColor;
-
-private:
-    friend struct llvm::yaml::MappingTraits<Config>;
+    
+    ClangSection Clang;
+    GMockSection GMock;
+    GeneralSection General;
+    MockingSection Mocking;
 };
 
 #endif /* CONFIG_HPP_ */

@@ -69,7 +69,7 @@ test/%.o: test/%.cpp test/%.inc
 	$(CXX) -c -o $@ -Isrc $(CPPFLAGS) $(CXXFLAGS) $<
 
 test/%.inc: src/%.c
-	./../../../build/release/ccmock -o $@ --config=test/ccmock.yaml $<
+	./../../../build/release/ccmock -o $@ $<
 
 clean:
 	rm -f $(obj) $(ut_obj) $(ut_bin) $(ut_out) $(ut_gen)

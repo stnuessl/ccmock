@@ -61,7 +61,18 @@ static llvm::cl::opt<std::string> BaseDirectory(
     llvm::cl::cat(ToolCategory)
 );
 
-static llvm::cl::opt<std::string> CompileCommandsFile(
+static llvm::cl::list<std::string> Blacklist(
+    "blacklist",
+    llvm::cl::desc(
+        "Do not generate mock functions for entities with a full qualified\n"
+        "name matching <pattern>.\n"
+    ),
+    llvm::cl::value_desc("pattern"),
+    llvm::cl::ValueOptional,
+    llvm::cl::cat(ToolCategory)
+);
+
+static llvm::cl::opt<std::string> CompileCommands(
     "compile-commands",
     llvm::cl::desc(
         "Use file <file> as the compilation database when running ccmock.\n"
@@ -164,9 +175,11 @@ static llvm::cl::opt<std::string> OutputFile(
 /* clang-format on */
 
 static std::unique_ptr<clang::tooling::CompilationDatabase>
-loadCompileCommands(llvm::StringRef Path, std::string &Message)
+loadCompileCommands(const std::shared_ptr<Config> Config, std::string &Message)
 {
     using namespace clang::tooling;
+
+    llvm::StringRef Path = Config->General.CompileCommands.native();
 
     if (Path.empty()) {
         llvm::SmallString<256> Buffer;
@@ -252,52 +265,58 @@ __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
         Config->read(File);
 
     if (!BaseDirectory.empty())
-        Config->BaseDirectory = std::move(BaseDirectory);
+        Config->General.BaseDirectory = std::move(BaseDirectory);
 
-    if (CompileCommandsFile.getNumOccurrences() != 0)
-        Config->CompileCommands = std::move(CompileCommandsFile.getValue());
+    if (!Blacklist.empty()) {
+        auto It = std::end(Config->Mocking.Blacklist);
+        auto Begin = std::make_move_iterator(std::begin(Blacklist));
+        auto End = std::make_move_iterator(std::end(Blacklist));
+
+        Config->Mocking.Blacklist.insert(It, Begin, End);
+    }
+
+    if (CompileCommands.getNumOccurrences() != 0)
+        Config->General.CompileCommands = std::move(CompileCommands);
 
     if (Verbose.getNumOccurrences() != 0)
-        Config->Verbose = Verbose;
-
-    if (Force.getNumOccurrences() != 0)
-        Config->Force = Force;
+        Config->General.Verbose = Verbose;
 
     if (Quiet.getNumOccurrences() != 0)
-        Config->Quiet = Quiet;
+        Config->General.Quiet = Quiet;
 
-    if (Strict.getNumOccurrences() != 0)
-        Config->Strict = Strict;
+    if (!InputFile.empty())
+        Config->General.Input = std::move(InputFile);
 
     if (!OutputFile.empty())
-        Config->Output = std::move(OutputFile);
+        Config->General.Output = std::move(OutputFile);
 
     /*
      * Dump the config now before adjusting it for program internal reasons
      * so the users can see their effective configuration settings.
      */
     if (DumpConfig) {
-        if (!Config->Output.empty())
-            Config->write(OutputFile);
+        if (!Config->General.Output.empty())
+            Config->write(Config->General.Output.native());
         else
             Config->write(llvm::outs());
 
         std::exit(EXIT_SUCCESS);
     }
 
-    if (Config->BaseDirectory.empty())
-        Config->BaseDirectory = std::filesystem::current_path();
+    if (Config->General.BaseDirectory.empty())
+        Config->General.BaseDirectory = std::filesystem::current_path();
 
-    if (!Config->Output.empty() && Config->Output.is_relative()) {
+    auto &Output = Config->General.Output;
+    if (!Output.empty() && Output.is_relative()) {
         /*
          * The ClangTool might change the working directory during its
          * invocation. We therefore use the absolute path for the output file
          * to make sure it will be created were the user expects it.
          */
-        Config->Output = std::filesystem::absolute(Config->Output);
+        Output = std::filesystem::absolute(Output);
     }
 
-    switch (Config->UseColor) {
+    switch (Config->General.UseColor) {
     case Config::UseColorType::AUTO:
         break;
     case Config::UseColorType::NEVER:
@@ -313,20 +332,20 @@ __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
     auto Factory = ActionFactory();
     Factory.setConfig(Config);
 
-    auto Commands = loadCompileCommands(Config->CompileCommands, Message);
+    auto Commands = loadCompileCommands(Config, Message);
     if (!Commands) {
         llvm::errs() << util::cl::error() << Message << "\n";
 
         std::exit(EXIT_FAILURE);
     }
 
-    if (InputFile.empty()) {
+    if (Config->General.Input.empty()) {
         llvm::errs() << util::cl::error()
                      << "no input source file specified.\n";
         std::exit(EXIT_FAILURE);
     }
 
-    auto Tool = clang::tooling::ClangTool(*Commands, InputFile);
+    auto Tool = clang::tooling::ClangTool(*Commands, Config->General.Input.native());
     Tool.run(&Factory);
 
     return EXIT_SUCCESS;

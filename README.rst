@@ -181,6 +181,10 @@ Specifying Configuration Files
 
    ccmock --config=<config>.yaml,<config>.yaml <input-file>
 
+.. code:: sh
+
+   CCMOCK_CONFIG=<config>.yaml ccmock --config=<config>.yaml,<config>.yaml <input-file>
+
 Dump Effective Configuration Settings
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -196,5 +200,4 @@ Open Points
 ===========
 
 * Mocking C++ is not implemented
-* The structure of the configuration file potentially needs reworked
 
