@@ -665,7 +665,7 @@ $(ut_dir)/%.$(OBJ_SUFFIX): %.cpp
 	$(Q)gcc -c -o $@ $(CPPFLAGS) $(CFLAGS) $<
 
 system-tests: $(release_bin)
-	make --directory test/system
+	$(MAKE) --directory test/system
 
 clean:
 	rm -rf $(BUILD_DIR)

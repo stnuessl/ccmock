@@ -17,6 +17,7 @@
 
 #include <llvm/Support/raw_ostream.h>
 
+#include <clang/Basic/Builtins.h>
 #include <clang/Basic/SourceManager.h>
 
 #include "ASTVisitor.hpp"
@@ -40,6 +41,22 @@ void ASTVisitor::setConfig(std::shared_ptr<const Config> Config)
 {
     Config_ = std::move(Config);
 
+    /* TODO: shamelessly stolen from clang-rename */
+#if 0
+      // Check if NewNames is a valid identifier in C++17.
+  LangOptions Options;
+  Options.CPlusPlus = true;
+  Options.CPlusPlus17 = true;
+  IdentifierTable Table(Options);
+  for (const auto &NewName : NewNames) {
+    auto NewNameTokKind = Table.get(NewName).getTokenID();
+    if (!tok::isAnyIdentifier(NewNameTokKind)) {
+      errs() << "ERROR: new name is not a valid identifier in C++17.\n\n";
+      return 1;
+    }
+  }
+#endif
+
     for (const auto &Name : Config_->Mocking.Blacklist) {
         if (!util::glob::isPattern(Name)) {
             Blacklist_.insert(Name);
@@ -48,14 +65,13 @@ void ASTVisitor::setConfig(std::shared_ptr<const Config> Config)
 
         auto ExpectedGlob = llvm::GlobPattern::create(Name);
         if (!ExpectedGlob) {
-            llvm::errs() << util::cl::error() 
-                         << ExpectedGlob.takeError() 
+            llvm::errs() << util::cl::error() << ExpectedGlob.takeError()
                          << "\n";
 
             std::exit(EXIT_FAILURE);
         }
 
-        GlobBlacklist_.push_back({ Name, std::move(*ExpectedGlob) });
+        GlobBlacklist_.push_back({Name, std::move(*ExpectedGlob)});
     }
 }
 
@@ -87,9 +103,13 @@ std::vector<const clang::FunctionDecl *> ASTVisitor::takeFunctionDecls()
     return Vector;
 }
 
-void ASTVisitor::dispatch(const clang::FunctionDecl *Decl)
+void ASTVisitor::dispatch(const clang::Expr *Expr,
+                          const clang::FunctionDecl *Decl)
 {
     llvm::raw_string_ostream OS(Buffer_);
+
+    if (!SourceManager_->isInMainFile(Expr->getExprLoc()))
+        return;
 
     if (!Decl)
         return;
@@ -103,19 +123,64 @@ void ASTVisitor::dispatch(const clang::FunctionDecl *Decl)
     if (Decl->hasBody())
         return;
 
-    if (Decl->isInStdNamespace())
+    /*
+     * Mocking this function raises a lot of issues as it is heavily used
+     * when dealing with system calls. This most likely will negatively
+     * impact any unit test framework before even running any tests.
+     */
+    if (Decl->getIdentifier() && Decl->getName().equals("__errno_location"))
         return;
 
-    if (Decl->getBuiltinID() && !Config_->Mocking.MockBuiltins)
-        return;
+    /*
+     * Deal with builtin functions which might refer to compiler builtins
+     * like "__builtin_expect" or standard library functions.
+     */
+    auto BuiltinID = Decl->getBuiltinID();
+    if (BuiltinID) {
+        auto Name = Decl->getName();
+
+        /* Non standard library builtins */
+        if (Name.startswith("__builtin_") && !Config_->Mocking.MockBuiltins) {
+            if (Config_->General.Verbose) {
+                llvm::errs() << util::cl::info() << "ignoring builtin \""
+                             << Name << "\"\n";
+            }
+
+            return;
+        }
+
+        /* C++ standard library functions */
+        if (Decl->isInStdNamespace() && !Config_->Mocking.MockCXXStdLib) {
+            if (Config_->General.Verbose) {
+                llvm::errs() << util::cl::info()
+                             << "ignoring C++ standard library function \"";
+                Decl->printQualifiedName(llvm::errs());
+                llvm::errs() << "\"\n";
+            }
+
+            return;
+        }
+
+        /* C standard library functions */
+        if (!Config_->Mocking.MockCStdLib) {
+            if (Config_->General.Verbose) {
+                llvm::errs() << util::cl::info()
+                             << "ignoring C standard library function \"";
+                Decl->printQualifiedName(llvm::errs());
+                llvm::errs() << "\"\n";
+            }
+
+            return;
+        }
+    }
 
     Buffer_.clear();
     Decl->printQualifiedName(OS);
 
     if (Blacklist_.count(Buffer_)) {
         if (Config_->General.Verbose) {
-            llvm::errs() << util::cl::info() << Buffer_
-                         << ": skipping function due to blacklist entry\n";
+            llvm::errs() << util::cl::info() << "ignoring \"" << Buffer_
+                         << "\" due to blacklist entry\n";
         }
         return;
     }
@@ -123,9 +188,9 @@ void ASTVisitor::dispatch(const clang::FunctionDecl *Decl)
     for (const auto &[Pattern, Glob] : GlobBlacklist_) {
         if (Glob.match(Buffer_)) {
             if (Config_->General.Verbose) {
-                llvm::errs() << util::cl::info() << Buffer_
-                             << ": skipping function due to blacklist entry \""
-                             << Pattern << "\"\n";
+                llvm::errs()
+                    << util::cl::info() << "skipping \"" << Buffer_
+                    << "\" due to blacklist entry \"" << Pattern << "\"\n";
             }
 
             return;
@@ -133,10 +198,17 @@ void ASTVisitor::dispatch(const clang::FunctionDecl *Decl)
     }
 
     if (Decl->isVariadic()) {
-        llvm::errs() << util::cl::error()
-                     << "cannot process variadic function \"" << *Decl
-                     << "\" - use a blacklist entry to avoid this error\n";
-        std::exit(EXIT_FAILURE);
+        if (!Config_->Mocking.MockVariadicFunctions)
+            return;
+
+        if (Decl->param_empty()) {
+            llvm::errs() << util::cl::error()
+                         << "unable to mock variadic function \"";
+            Decl->printQualifiedName(llvm::errs());
+            llvm::errs() << "\" with no parameters\n";
+
+            std::exit(EXIT_FAILURE);
+        }
     }
 
     auto ID = Decl->getID();
@@ -150,31 +222,22 @@ void ASTVisitor::dispatch(const clang::FunctionDecl *Decl)
         Decl->printQualifiedName(llvm::errs());
 
         llvm::errs() << ": failed to save function for further processing\n";
+
         std::exit(EXIT_FAILURE);
     }
 }
 
 void ASTVisitor::doVisitCallExpr(const clang::CallExpr *CallExpr)
 {
-    auto Loc = CallExpr->getExprLoc();
-
-    if (!SourceManager_->isInMainFile(Loc))
-        return;
-
     auto Decl = CallExpr->getDirectCallee();
 
-    dispatch(Decl);
+    dispatch(CallExpr, Decl);
 }
 
 void ASTVisitor::doVisitCXXConstructExpr(
     const clang::CXXConstructExpr *ConstructExpr)
 {
-    auto Loc = ConstructExpr->getExprLoc();
+    auto Decl = ConstructExpr->getConstructor();
 
-    if (!SourceManager_->isInMainFile(Loc))
-        return;
-
-    auto ConstructerDecl = ConstructExpr->getConstructor();
-
-    dispatch(ConstructerDecl);
+    dispatch(ConstructExpr, Decl);
 }

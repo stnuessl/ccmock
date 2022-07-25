@@ -19,7 +19,6 @@
 
 #include <clang/Frontend/FrontendActions.h>
 #include <clang/Tooling/CommonOptionsParser.h>
-#include <clang/Tooling/JSONCompilationDatabase.h>
 #include <clang/Tooling/Tooling.h>
 
 #include <llvm/Support/CommandLine.h>
@@ -28,6 +27,7 @@
 #include "util/commandline.hpp"
 
 #include "ActionFactory.hpp"
+#include "CompilationDatabase.hpp"
 #include "Config.hpp"
 
 #ifndef CCMOCK_VERSION_CORE
@@ -39,7 +39,7 @@
 static llvm::cl::OptionCategory ToolCategory("Tool Options");
 
 
-static llvm::cl::opt<std::string> InputFile(
+static llvm::cl::opt<std::string> Input(
     llvm::cl::desc("<file>"),
     llvm::cl::value_desc("file"),
     llvm::cl::ValueRequired,
@@ -68,7 +68,7 @@ static llvm::cl::list<std::string> Blacklist(
         "name matching <pattern>.\n"
     ),
     llvm::cl::value_desc("pattern"),
-    llvm::cl::ValueOptional,
+    llvm::cl::ValueRequired,
     llvm::cl::cat(ToolCategory)
 );
 
@@ -80,7 +80,20 @@ static llvm::cl::opt<std::string> CompileCommands(
         "parent directories of the current working directory.\n"
     ),
     llvm::cl::value_desc("file"),
-    llvm::cl::ValueOptional,
+    llvm::cl::ValueRequired,
+    llvm::cl::cat(ToolCategory)
+);
+
+static llvm::cl::opt<size_t> CompileCommandIndex(
+    "cc-index",
+    llvm::cl::desc(
+        "If there are multiple compile commands for the passed input file\n"
+        "in the compilation database, use the command at <index> specific\n"
+        "to this file.\n"
+    ),
+    llvm::cl::value_desc("index"),
+    llvm::cl::init(0),
+    llvm::cl::ValueRequired,
     llvm::cl::cat(ToolCategory)
 );
 
@@ -104,6 +117,18 @@ static llvm::cl::opt<bool> DumpConfig(
         "Can be combined with the \"-o\" option.\n"
     ),
     llvm::cl::init(false),
+    llvm::cl::cat(ToolCategory)
+);
+
+static llvm::cl::list<std::string> ExtraArguments(
+    "extra-args",
+    llvm::cl::desc(
+        "Append additional command-line arguments to the invocation of\n"
+        "the internally used clang compiler.\n"
+    ),
+    llvm::cl::value_desc("arg"),
+    llvm::cl::ValueRequired,
+    llvm::cl::CommaSeparated,
     llvm::cl::cat(ToolCategory)
 );
 
@@ -161,58 +186,63 @@ static llvm::cl::alias QuietAlias(
     llvm::cl::NotHidden
 );
 
-static llvm::cl::opt<std::string> OutputFile(
+static llvm::cl::opt<std::string> Output(
     "o",
     llvm::cl::desc(
         "Specifiy the name of the output file. If none is specified\n"
         "the generated output will be printed to standard output.\n"
     ),
     llvm::cl::value_desc("file"),
+    llvm::cl::ZeroOrMore,
+    llvm::cl::ValueRequired,
+    llvm::cl::cat(ToolCategory)
+);
+
+static llvm::cl::opt<std::string> ResourceDirectory(
+    "resource-directory",
+    llvm::cl::desc(
+        "Path to the clang resource directory. Required by clang tools to\n"
+        "include clang specific header files. The program tries to\n"
+        "automatically detect the appropriate directory.\n"
+    ),
+    llvm::cl::value_desc("path"),
     llvm::cl::ValueRequired,
     llvm::cl::cat(ToolCategory)
 );
 
 /* clang-format on */
 
-static std::unique_ptr<clang::tooling::CompilationDatabase>
-loadCompileCommands(const std::shared_ptr<Config> Config, std::string &Message)
-{
-    using namespace clang::tooling;
-
-    llvm::StringRef Path = Config->General.CompileCommands.native();
-
-    if (Path.empty()) {
-        llvm::SmallString<256> Buffer;
-
-        auto Error = llvm::sys::fs::current_path(Buffer);
-
-        if (Error) {
-            llvm::errs() << util::cl::warning()
-                         << "failed to retrieve working directory: "
-                         << Error.message() << "\n";
-            Buffer = ".";
-        }
-
-        Path = Buffer.str();
-        return CompilationDatabase::autoDetectFromDirectory(Path, Message);
+class ExtraArgumentsAdjuster {
+public:
+    explicit ExtraArgumentsAdjuster(std::vector<std::string> &&ExtraArgs)
+        : ExtraArgs_(std::move(ExtraArgs))
+    {
     }
 
-    auto Ext = llvm::sys::path::extension(Path);
+    clang::tooling::CommandLineArguments
+    operator()(const clang::tooling::CommandLineArguments &Args,
+               llvm::StringRef File)
+    {
+        /*
+         * We need to work on copies as this adjuster might be used multiple
+         * times by the ClangTool.
+         */
+        auto AdjustedArgs = Args;
 
-    if (Ext.equals(".json")) {
-        auto Syntax = JSONCommandLineSyntax::AutoDetect;
-        return JSONCompilationDatabase::loadFromFile(Path, Message, Syntax);
+        (void) File;
+
+        auto It = std::end(AdjustedArgs);
+        auto Begin = std::begin(ExtraArgs_);
+        auto End = std::end(ExtraArgs_);
+
+        AdjustedArgs.insert(It, Begin, End);
+
+        return AdjustedArgs;
     }
 
-    if (Ext.equals(".txt"))
-        return FixedCompilationDatabase::loadFromFile(Path, Message);
-
-    llvm::errs() << util::cl::error()
-                 << "failed to load compile commands from \"" << Path
-                 << "\": unsupported extension\n";
-
-    std::exit(EXIT_FAILURE);
-}
+private:
+    clang::tooling::CommandLineArguments ExtraArgs_;
+};
 
 __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
 {
@@ -264,16 +294,20 @@ __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
     if (llvm::StringRef File = ::getenv("CCMOCK_CONFIG"); !File.empty())
         Config->read(File);
 
+    if (!ExtraArguments.empty())
+        Config->Clang.ExtraArguments = std::move(ExtraArguments);
+
+    if (!ResourceDirectory.empty())
+        Config->Clang.ResourceDirectory = std::move(ResourceDirectory);
+
     if (!BaseDirectory.empty())
         Config->General.BaseDirectory = std::move(BaseDirectory);
 
-    if (!Blacklist.empty()) {
-        auto It = std::end(Config->Mocking.Blacklist);
-        auto Begin = std::make_move_iterator(std::begin(Blacklist));
-        auto End = std::make_move_iterator(std::end(Blacklist));
+    if (CompileCommandIndex.getNumOccurrences() != 0)
+        Config->General.CompileCommandIndex = CompileCommandIndex;
 
-        Config->Mocking.Blacklist.insert(It, Begin, End);
-    }
+    if (!Blacklist.empty())
+        Config->Mocking.Blacklist = std::move(Blacklist);
 
     if (CompileCommands.getNumOccurrences() != 0)
         Config->General.CompileCommands = std::move(CompileCommands);
@@ -284,11 +318,11 @@ __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
     if (Quiet.getNumOccurrences() != 0)
         Config->General.Quiet = Quiet;
 
-    if (!InputFile.empty())
-        Config->General.Input = std::move(InputFile);
+    if (!Input.empty())
+        Config->General.Input = std::move(Input);
 
-    if (!OutputFile.empty())
-        Config->General.Output = std::move(OutputFile);
+    if (!Output.empty())
+        Config->General.Output = std::move(Output);
 
     /*
      * Dump the config now before adjusting it for program internal reasons
@@ -306,14 +340,14 @@ __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
     if (Config->General.BaseDirectory.empty())
         Config->General.BaseDirectory = std::filesystem::current_path();
 
-    auto &Output = Config->General.Output;
-    if (!Output.empty() && Output.is_relative()) {
+    auto &Path = Config->General.Output;
+    if (!Path.empty() && Path.is_relative()) {
         /*
          * The ClangTool might change the working directory during its
          * invocation. We therefore use the absolute path for the output file
          * to make sure it will be created were the user expects it.
          */
-        Output = std::filesystem::absolute(Output);
+        Path = std::filesystem::absolute(Path);
     }
 
     switch (Config->General.UseColor) {
@@ -329,13 +363,16 @@ __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
         break;
     }
 
-    auto Factory = ActionFactory();
-    Factory.setConfig(Config);
+    /* Prepare inputs for the invocation of the ClangTool */
+    auto Commands = CompilationDatabase();
+    Commands.setIndex(CompileCommandIndex);
+    if (!Config->General.CompileCommands.empty())
+        Commands.load(Config->General.CompileCommands, Message);
+    else
+        Commands.detect(Config->General.Input, Message);
 
-    auto Commands = loadCompileCommands(Config, Message);
     if (!Commands) {
         llvm::errs() << util::cl::error() << Message << "\n";
-
         std::exit(EXIT_FAILURE);
     }
 
@@ -345,10 +382,18 @@ __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
         std::exit(EXIT_FAILURE);
     }
 
-    auto Tool = clang::tooling::ClangTool(*Commands, Config->General.Input.native());
-    Tool.run(&Factory);
+    auto &Input = Config->General.Input.native();
+    auto &ExtraArgs = Config->Clang.ExtraArguments;
+    auto Adjuster = ExtraArgumentsAdjuster(std::move(ExtraArgs));
 
-    return EXIT_SUCCESS;
+    auto Factory = ActionFactory();
+    Factory.setConfig(Config);
+
+    /* Perform the ClangTool invocation */
+    auto Tool = clang::tooling::ClangTool(Commands, Input);
+    Tool.appendArgumentsAdjuster(std::move(Adjuster));
+
+    return Tool.run(&Factory);
 }
 
 #ifndef UNIT_TESTS_ENABLED

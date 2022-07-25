@@ -27,7 +27,6 @@
 #include "GMockGenerator.hpp"
 
 #include "util/Decl.hpp"
-#include "util/Type.hpp"
 #include "util/commandline.hpp"
 
 GMockGenerator::GMockGenerator(std::shared_ptr<const Config> Config,
@@ -80,9 +79,8 @@ void GMockGenerator::dumpMocks()
 
     auto outs = llvm::raw_fd_stream(Config_->General.Output.native(), error);
     if (error) {
-        llvm::errs() << util::cl::error() 
-                     << "failed to open \""
-                     << Config_->General.Output.native() 
+        llvm::errs() << util::cl::error() << "failed to open \""
+                     << Config_->General.Output.native()
                      << "\": " << error.message() << "\n";
         std::exit(EXIT_FAILURE);
     }
@@ -170,7 +168,7 @@ void GMockGenerator::writeGlobalFunctionMocks(
         Out_ << "    MOCK_METHOD((";
         FunctionDecl->getReturnType().print(Out_, PrintingPolicy_);
         Out_ << "), " << *FunctionDecl << ", ";
-        writeParameterList(FunctionDecl, /* WriteParmVarNames */ false);
+        writeMockParameterList(FunctionDecl);
         Out_ << ");\n";
     }
 
@@ -184,9 +182,8 @@ void GMockGenerator::writeGlobalFunctionMocks(
      * Example output:
      *      static testing::StrictMock<MockName> MockName;
      */
-    Out_ << "static testing::" << MockType 
-         << "<" << Config_->GMock.MockName << "> "
-         << Config_->GMock.MockName << ";\n\n";
+    Out_ << "static testing::" << MockType << "<" << Config_->GMock.MockName
+         << "> " << Config_->GMock.MockName << ";\n\n";
 
     /* Write the mock function definitions */
     for (const auto FunctionDecl : Vec) {
@@ -196,11 +193,11 @@ void GMockGenerator::writeGlobalFunctionMocks(
         auto Type = FunctionDecl->getReturnType();
         Type.print(Out_, PrintingPolicy_);
 
-        if (!util::type::isPointerOrReference(Type))
+        if (!Type->isPointerType() && !Type->isReferenceType())
             Out_ << " ";
 
         Out_ << *FunctionDecl;
-        writeParameterList(FunctionDecl, /* WriteParmVarNames */ true);
+        writeFunctionParameterList(FunctionDecl);
         Out_ << "\n";
         writeFunctionBody(FunctionDecl);
         Out_ << "\n";
@@ -229,64 +226,8 @@ int main(int argc, char *argv[])
     /* clang-format on */
 }
 
-void GMockGenerator::writeParmVarDecl(const clang::ParmVarDecl *Decl,
-                                      bool WriteParmVarName,
-                                      llvm::StringRef Fallback)
+void GMockGenerator::writeFunctionParameterList(const clang::FunctionDecl *Decl)
 {
-    if (!WriteParmVarName) {
-        Decl->getType().print(Out_, PrintingPolicy_);
-        return;
-    }
-
-    if (!Decl->getName().empty()) {
-        Decl->print(Out_, PrintingPolicy_);
-        return;
-    }
-
-    auto Type = Decl->getType();
-
-    if (!util::type::isPointerOrReference(Type)) {
-        Type.print(Out_, PrintingPolicy_);
-
-        if (!util::type::isPointerOrReference(Type))
-            Out_ << " ";
-
-        Out_ << Fallback;
-        return;
-    }
-
-    /*
-     * Function pointers or references can be extremely tricky to print
-     * as the name of the corresponding variable is surrounded by its own
-     * type, e.g.:
-     *      void *(*func)(void (*)(int, int))
-     *             ^~~~
-     * We therefore create a new VarDecl (which is obviously not part of
-     * the parsed source code) with an appropriate name and then let clang's
-     * "Decl::print" function do the heavy lifting.
-     */
-    auto &ASTContext = Decl->getASTContext();
-    auto Loc = clang::SourceLocation();
-
-    auto &IdInfo = ASTContext.Idents.getOwn(Fallback);
-
-    auto VarDecl = clang::VarDecl::Create(ASTContext,
-                                          ASTContext.getTranslationUnitDecl(),
-                                          Loc,
-                                          Loc,
-                                          &IdInfo,
-                                          Type,
-                                          nullptr,
-                                          clang::StorageClass::SC_None);
-
-    VarDecl->print(Out_, PrintingPolicy_);
-}
-
-void GMockGenerator::writeParameterList(const clang::FunctionDecl *Decl,
-                                        bool WriteParmVarNames)
-{
-    std::string Fallback;
-    llvm::raw_string_ostream FallbackOS(Fallback);
     auto Parameters = Decl->parameters();
 
     if (Parameters.empty()) {
@@ -304,11 +245,94 @@ void GMockGenerator::writeParameterList(const clang::FunctionDecl *Decl,
         if (i != 0)
             Out_ << ", ";
 
-        Fallback.clear();
-        FallbackOS << "arg" << i + 1;
+        if (!Parameters[i]->getName().empty()) {
+            Parameters[i]->print(Out_, PrintingPolicy_);
+            continue;
+        }
 
-        writeParmVarDecl(Parameters[i], WriteParmVarNames, Fallback);
+        auto Type = Parameters[i]->getType();
+        auto Pointee = Type->getPointeeType();
+
+        if (Pointee.isNull() || !Pointee->isFunctionType()) {
+            Type.print(Out_, PrintingPolicy_);
+
+            /*
+             * We need to be aware of something like "char *const ptr;".
+             * Just checking for "isPointerType()" or "isReferenceType()" to
+             * determine whether we need to append a space character or not is
+             * not sufficient to correctly print such a type declaration.
+             */
+            if (auto C = Buffer_.back(); C != '&' && C != '*')
+                Out_ << " ";
+
+            Out_ << "arg" << i + 1;
+
+            continue;
+        }
+
+        /*
+         * Function pointers or references can be extremely tricky to print
+         * as the name of the corresponding variable is surrounded by its own
+         * type, e.g.:
+         *      void *(*func)(void (*)(int, int))
+         *             ^~~~
+         * We therefore create a new VarDecl (which is obviously not part of
+         * the parsed source code) with an appropriate name and then let
+         * clang's "Decl::print" function do the heavy lifting.
+         */
+        std::string ArgName;
+        llvm::raw_string_ostream OS(ArgName);
+
+        OS << "arg" << i + 1;
+
+        auto &ASTContext = Decl->getASTContext();
+        auto TranslationUnitDecl = ASTContext.getTranslationUnitDecl();
+        auto Loc = clang::SourceLocation();
+
+        auto &IdInfo = ASTContext.Idents.getOwn(ArgName);
+
+        auto VarDecl = clang::VarDecl::Create(ASTContext,
+                                              TranslationUnitDecl,
+                                              Loc,
+                                              Loc,
+                                              &IdInfo,
+                                              Type,
+                                              nullptr,
+                                              clang::StorageClass::SC_None);
+
+        VarDecl->print(Out_, PrintingPolicy_);
     }
+
+    if (Decl->isVariadic())
+        Out_ << ", ...";
+
+    Out_ << ")";
+}
+
+void GMockGenerator::writeMockParameterList(const clang::FunctionDecl *Decl)
+{
+    auto Parameters = Decl->parameters();
+
+    if (Parameters.empty()) {
+        if (PrintingPolicy_.UseVoidForZeroParams)
+            Out_ << "(void)";
+        else
+            Out_ << "()";
+
+        return;
+    }
+
+    Out_ << "(";
+
+    for (unsigned int i = 0, Size = Parameters.size(); i < Size; ++i) {
+        if (i != 0)
+            Out_ << ", ";
+
+        Parameters[i]->getType().print(Out_, PrintingPolicy_);
+    }
+
+    if (Decl->isVariadic())
+        Out_ << ", va_list";
 
     Out_ << ")";
 }
@@ -318,21 +342,9 @@ void GMockGenerator::writeFunctionSpecifiers(const clang::FunctionDecl *Decl)
     (void) Decl;
 }
 
-void GMockGenerator::writeFunctionBody(const clang::FunctionDecl *Decl)
+void GMockGenerator::writeMockCall(const clang::FunctionDecl *Decl)
 {
     auto Parameters = Decl->parameters();
-
-    /*
-     * Example output:
-     *  {
-     *      return mock.func(arg1, arg2);
-     *  }
-     */
-    Out_ << "{\n"
-         << "    ";
-
-    if (!Decl->getReturnType()->isVoidType())
-        Out_ << "return ";
 
     Out_ << Config_->GMock.MockName << "." << *Decl << "(";
 
@@ -346,6 +358,73 @@ void GMockGenerator::writeFunctionBody(const clang::FunctionDecl *Decl)
             Out_ << "arg" << i + 1;
     }
 
+    if (Decl->isVariadic())
+        Out_ << ", vargs_";
+
+    Out_ << ");\n";
+}
+
+void GMockGenerator::writeFunctionBody(const clang::FunctionDecl *Decl)
+{
+    auto Parameters = Decl->parameters();
+
+    /*
+     * Example output:
+     *  {
+     *      return mock.func(arg1, arg2);
+     *  }
+     */
+    if (!Decl->isVariadic()) {
+        Out_ << "{\n"
+             << "    ";
+
+        if (!Decl->getReturnType()->isVoidType())
+            Out_ << "return ";
+
+        writeMockCall(Decl);
+
+        Out_ << "}\n";
+
+        return;
+    }
+
+    /* Example output for variadic mock:
+     *  {
+     *      va_list vargs_;
+     *
+     *      va_start(vargs_, arg);
+     *      auto value_ = mock.func(arg, vargs_);
+     *      va_end(vargs_);
+     *
+     *      return value_;
+     *  }
+     */
+
+    Out_ << "{\n"
+            "    va_list vargs_;\n"
+            "\n"
+            "    va_start(vargs_, ";
+
+    auto ParmVarDecl = Parameters.back();
+    if (!ParmVarDecl->getName().empty())
+        Out_ << *ParmVarDecl;
+    else
+        Out_ << "arg" << Parameters.size();
+
     Out_ << ");\n"
-            "}\n";
+         << "    ";
+
+    if (!Decl->getReturnType()->isVoidType())
+        Out_ << "auto value_ = ";
+
+    writeMockCall(Decl);
+
+    Out_ << "    va_end(vargs_);\n";
+
+    if (!Decl->getReturnType()->isVoidType()) {
+        Out_ << "\n"
+                "    return value_;\n";
+    }
+
+    Out_ << "}\n";
 }

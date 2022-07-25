@@ -22,21 +22,26 @@
 # THE SOFTWARE.
 #
 
-all: basic zlib-ng
+all: basic zlib-ng scripts
 
 basic: basic/Makefile
-	make --directory $@
+	$(MAKE) --directory $@
 
 zlib-ng: zlib-ng/Makefile
-	make --directory $@
+	$(MAKE) --directory $@
+
+scripts: scripts/Makefile
+	$(MAKE) --directory $@
 
 clean:
-	make --directory basic clean
-	make --directory zlib-ng clean
+	$(MAKE) --directory basic clean
+	$(MAKE) --directory zlib-ng clean
+	$(MAKE) --directory scripts clean
 
 
 .PHONY: \
 	all \
 	clean \
 	basic \
-	zlib-ng
+	zlib-ng \
+	scripts

@@ -43,7 +43,8 @@ public:
     std::vector<const clang::FunctionDecl *> takeFunctionDecls();
 
 private:
-    void dispatch(const clang::FunctionDecl *FunctionDecl);
+    void dispatch(const clang::Expr *Expr,
+                  const clang::FunctionDecl *FunctionDecl);
 
     void doVisitCallExpr(const clang::CallExpr *CallExpr);
     void doVisitCXXConstructExpr(const clang::CXXConstructExpr *ConstructExpr);

@@ -58,16 +58,21 @@ template <> struct MappingTraits<Config::ClangSection> {
 public:
     static void mapping(llvm::yaml::IO &IO, Config::ClangSection &Section)
     {
+        IO.mapOptional("ExtraArguments", Section.ExtraArguments);
         IO.mapOptional("ResourceDirectory", Section.ResourceDirectory);
     }
-    
-    static std::string validate(llvm::yaml::IO &IO, Config::ClangSection &Section)
+
+    static std::string validate(llvm::yaml::IO &IO,
+                                Config::ClangSection &Section)
     {
         std::string Message;
         llvm::raw_string_ostream OS(Message);
         std::error_code Error;
 
         (void) IO;
+
+        if (Section.ResourceDirectory.empty())
+            return "";
 
         if (std::filesystem::is_directory(Section.ResourceDirectory, Error))
             return "";
@@ -78,7 +83,7 @@ public:
             return Message;
         }
 
-        OS << "\"" << Section.ResourceDirectory.native() 
+        OS << "\"" << Section.ResourceDirectory.native()
            << "\" is not a directory";
 
         return Message;
@@ -95,7 +100,8 @@ public:
         IO.mapOptional("WriteMain", Section.WriteMain);
     }
 
-    static std::string validate(llvm::yaml::IO &IO, Config::GMockSection &Section)
+    static std::string validate(llvm::yaml::IO &IO,
+                                Config::GMockSection &Section)
     {
         (void) IO;
 
@@ -121,6 +127,7 @@ public:
         IO.mapOptional("Input", Section.Input);
         IO.mapOptional("Output", Section.Output);
 
+        IO.mapOptional("CompileCommandIndex", Section.CompileCommandIndex);
         IO.mapOptional("UseColor", Section.UseColor);
 
         IO.mapOptional("Quiet", Section.Quiet);
@@ -128,37 +135,12 @@ public:
         IO.mapOptional("WriteDate", Section.WriteDate);
     }
 
-    static std::string validate(llvm::yaml::IO &IO, Config::GeneralSection &Section)
+    static std::string validate(llvm::yaml::IO &IO,
+                                Config::GeneralSection &Section)
     {
-        llvm::ArrayRef<const std::filesystem::path *> List = {
-            &Section.CompileCommands,
-            &Section.Input,
-            &Section.Output,
-        };
-        std::string Message;
-        llvm::raw_string_ostream OS(Message);
-        std::error_code Error;
-
         (void) IO;
+        (void) Section;
 
-        for (auto File : List) {
-            if (File->empty())
-                continue;
-
-            if (!std::filesystem::is_directory(*File, Error))
-                continue;
-
-
-            if (Error) {
-                OS << File->native() << ": " << Error.message();
-
-                return Message;
-            }
-
-            OS << File->native() << ": is a directory";
-
-            return Message;
-        }
         return "";
     }
 };
@@ -169,7 +151,9 @@ public:
     {
         IO.mapOptional("Blacklist", Section.Blacklist);
         IO.mapOptional("MockBuiltins", Section.MockBuiltins);
-        IO.mapOptional("MockStdlib", Section.MockStdlib);
+        IO.mapOptional("MockCStdLib", Section.MockCStdLib);
+        IO.mapOptional("MockC++StdLib", Section.MockCXXStdLib);
+        IO.mapOptional("MockVariadicFunctions", Section.MockVariadicFunctions);
     }
 };
 
@@ -187,8 +171,7 @@ public:
 } // namespace yaml
 } // namespace llvm
 
-Config::ClangSection::ClangSection()
-    : ResourceDirectory()
+Config::ClangSection::ClangSection() : ExtraArguments(), ResourceDirectory()
 {
 }
 
@@ -203,26 +186,26 @@ Config::GMockSection::GMockSection()
 Config::GeneralSection::GeneralSection()
     : BaseDirectory(),
       CompileCommands(),
+      Input(),
       Output(),
+      CompileCommandIndex(0),
       UseColor(Config::UseColorType::AUTO),
       Quiet(false),
       Verbose(false),
-      WriteDate(false)
+      WriteDate(true)
 {
 }
 
 Config::MockingSection::MockingSection()
     : Blacklist(),
       MockBuiltins(false),
-      MockStdlib(false)
+      MockCStdLib(false),
+      MockCXXStdLib(false),
+      MockVariadicFunctions(true)
 {
 }
 
-Config::Config()
-    : Clang(),
-      GMock(),
-      General(),
-      Mocking()
+Config::Config() : Clang(), GMock(), General(), Mocking()
 {
 }
 
@@ -266,5 +249,3 @@ void Config::write(llvm::raw_ostream &OS)
 
     YamlOutput << *this;
 }
-
-

@@ -81,7 +81,7 @@ bool MockAction::PrepareToExecuteAction(clang::CompilerInstance &CI)
     if (Path.empty()) {
         Path = DetectClangResourceDirectory();
         if (Path.empty()) {
-            llvm::errs() << "Failed to detect clang resource directory\n";
+            llvm::errs() << "failed to detect clang resource directory\n";
             return false;
         }
     }

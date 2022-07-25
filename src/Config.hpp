@@ -37,6 +37,7 @@ public:
     public:
         ClangSection();
 
+        std::vector<std::string> ExtraArguments;
         std::filesystem::path ResourceDirectory;
     };
 
@@ -48,7 +49,8 @@ public:
         std::filesystem::path CompileCommands;
         std::filesystem::path Input;
         std::filesystem::path Output;
-        
+
+        unsigned int CompileCommandIndex;
         enum UseColorType UseColor;
 
         bool Quiet;
@@ -69,11 +71,13 @@ public:
     struct MockingSection {
     public:
         MockingSection();
-        
+
         std::vector<std::string> Blacklist;
 
         bool MockBuiltins;
-        bool MockStdlib;
+        bool MockCStdLib;
+        bool MockCXXStdLib;
+        bool MockVariadicFunctions;
     };
 
     Config();
@@ -81,7 +85,7 @@ public:
     void read(llvm::StringRef Path);
     void write(llvm::StringRef Path);
     void write(llvm::raw_ostream &OS);
-    
+
     ClangSection Clang;
     GMockSection GMock;
     GeneralSection General;

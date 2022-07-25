@@ -19,10 +19,10 @@
 extern "C" {
 #endif
 
+#include "../src/deflate.h"
 #include "../src/functable.h"
 #include "../src/zbuild.h"
 #include "../src/zlib-ng.h"
-#include "../src/deflate.h"
 
 void crc_reset(deflate_state *const s);
 
@@ -52,14 +52,13 @@ TEST(crc_reset, 001)
 #ifdef X86_PCLMULQDQ_CRC
     x86_cpu_has_pclmulqdq = 1;
 
-    EXPECT_CALL(mock, x86_check_features())
-        .Times(1);
+    EXPECT_CALL(mock, x86_check_features()).Times(1);
 
     EXPECT_CALL(mock, crc_fold_init(&state))
         .WillOnce(testing::Assign(&state.strm->adler, 0));
 #endif
 
-    crc_reset(&state); 
+    crc_reset(&state);
 
     ASSERT_EQ(0, state.strm->adler);
 }
@@ -75,11 +74,10 @@ TEST(crc_reset, 002)
 #ifdef X86_PCLMULQDQ_CRC
     x86_cpu_has_pclmulqdq = 0;
 
-    EXPECT_CALL(mock, x86_check_features())
-        .Times(1);
+    EXPECT_CALL(mock, x86_check_features()).Times(1);
 #endif
 
-    crc_reset(&state); 
+    crc_reset(&state);
 
     ASSERT_EQ(0, state.strm->adler);
 }

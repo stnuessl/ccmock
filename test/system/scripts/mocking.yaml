@@ -1,0 +1,10 @@
+---
+Mocking:
+  Blacklist:
+    - printf
+    - std::copy
+    - __builtin_*
+  MockBuiltins: true
+  MockCStdLib: true
+  MockC++StdLib: true
+...

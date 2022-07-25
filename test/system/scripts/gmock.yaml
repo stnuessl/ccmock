@@ -1,0 +1,7 @@
+---
+GMock:
+  MockType: NiceMock
+  MockName: MyMockName
+  MockSuffix: MyMockSuffix
+  WriteMain: false
+...

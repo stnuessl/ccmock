@@ -196,8 +196,28 @@ Dump Effective Configuration Settings
 
    ccmock --dump-config -o <output-file>
 
+.. code:: sh
+
+   ccmock --config=<config>.yaml,<config>.yaml --blacklist=<name> --dump-config
+
+Pass Additional Compiler Flags to the Clang Frontend
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code:: sh
+
+   ccmock --extra-args=-DNDEBUG,-Wall,-Werror <input-file>
+
+Best Practices
+--------------
+
+* Always name your parameters in function declarations.
+* Don't mock very fundamental functions like malloc(), open(), etc...
+  as doing so will very likey break your unit test library in unpredictable
+  ways.
+
 Open Points
 ===========
 
 * Mocking C++ is not implemented
+* Fake Function Framework generator not implemented
 

@@ -15,20 +15,21 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef TYPE_HPP_
-#define TYPE_HPP_
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#include <clang/AST/Type.h>
+void app_print(const char *fmt, ...);
+int app_main(int argc, char *argv[]);
 
-namespace util {
-namespace type {
-
-inline bool isPointerOrReference(const clang::QualType Type)
-{
-    return Type->isPointerType() || Type->isReferenceType();
+#ifdef __cplusplus
 }
+#endif
 
-} // namespace type
-} // namespace util
+#include "app.inc"
 
-#endif /* TYPE_HPP_ */
+
+TEST(main, basic)
+{
+
+}

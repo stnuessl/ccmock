@@ -22,6 +22,8 @@
 # THE SOFTWARE.
 #
 
+export PROJECT_DIRECTORY := $(CURDIR)
+
 SHELL	:= bash -o pipefail
 CC		:= clang
 CXX		:= clang
@@ -68,11 +70,14 @@ src/%.o: src/%.c
 test/%.o: test/%.cpp test/%.inc
 	$(CXX) -c -o $@ -Isrc $(CPPFLAGS) $(CXXFLAGS) $<
 
-test/%.inc: src/%.c
+test/%.inc: src/%.c compile_commands.json
 	./../../../build/release/ccmock -o $@ $<
 
+compile_commands.json: compile_commands.in
+	envsubst "\$${PROJECT_DIRECTORY}" < $< > $@ || (rm -f $@ && false)
+
 clean:
-	rm -f $(obj) $(ut_obj) $(ut_bin) $(ut_out) $(ut_gen)
+	rm -f $(obj) $(ut_obj) $(ut_bin) $(ut_out) $(ut_gen) compile_commands.json
 
 .PHONY: \
 	all \

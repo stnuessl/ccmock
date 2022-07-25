@@ -34,6 +34,8 @@ public:
     GMockGenerator(std::shared_ptr<const Config> Config,
                    clang::PrintingPolicy Policy);
 
+    void setOutputFile(llvm::StringRef File);
+
     virtual void HandleTranslationUnit(clang::ASTContext &Context) override;
 
     void dumpMocks();
@@ -46,11 +48,9 @@ private:
     void writeClassMethodMocks();
     void writeMainFunctionDefinition();
 
-    void writeParmVarDecl(const clang::ParmVarDecl *Decl,
-                          bool WriteParmVarName,
-                          llvm::StringRef Fallback = llvm::StringRef());
-    void writeParameterList(const clang::FunctionDecl *Decl,
-                            bool WriteParmVarNames);
+    void writeFunctionParameterList(const clang::FunctionDecl *Decl);
+    void writeMockParameterList(const clang::FunctionDecl *Decl);
+    void writeMockCall(const clang::FunctionDecl *Decl);
     void writeFunctionBody(const clang::FunctionDecl *Decl);
     void writeFunctionSpecifiers(const clang::FunctionDecl *Decl);
 
