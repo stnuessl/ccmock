@@ -15,25 +15,18 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef DECL_HPP_
-#define DECL_HPP_
+#include <gtest/gtest.h>
+#include <stdarg.h>
 
-#include <clang/AST/Decl.h>
-#include <clang/AST/DeclCXX.h>
+#include "app.inc"
 
-namespace util {
-namespace decl {
-
-inline bool isGlobalFunction(const clang::FunctionDecl *Decl)
+TEST(main, basic)
 {
-    return !clang::isa<clang::CXXMethodDecl>(Decl) && Decl->isGlobal();
 }
 
-clang::VarDecl *fakeVarDecl(clang::ASTContext &Context,
-                            clang::QualType Type,
-                            llvm::StringRef Name);
+int main(int argc, char *argv[])
+{
+    testing::InitGoogleTest(&argc, argv);
 
-} /* namespace decl */
-} /* namespace util */
-
-#endif /* DECL_HPP_ */
+    return RUN_ALL_TESTS();
+}

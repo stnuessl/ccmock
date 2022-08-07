@@ -11,12 +11,14 @@ RUN apt-get update && apt-get --assume-yes install \
     bsdmainutils \
     clang \
     clang-tools \
+    cmake \
     cppcheck \
     curl \
     findutils \
     g++ \
     gcc \
     gettext-base \
+    git \
     lcov \
     libclang-dev \
     libgmock-dev \

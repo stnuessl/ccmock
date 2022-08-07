@@ -22,28 +22,32 @@
 # THE SOFTWARE.
 #
 
-all: basic zlib-ng scripts
+CCMOCK	:= ../../../build/release/ccmock
+BUILD_DIR := ../../../build/system-tests/scripts
+RESULT_DIR := ../../../build/system-tests/results/scripts
 
-basic: basic/Makefile
-	$(MAKE) --directory $@ CCMOCK_BACKEND=gmock
-	$(MAKE) --directory $@ CCMOCK_BACKEND=fff
 
-zlib-ng: zlib-ng/Makefile
-	$(MAKE) --directory $@ CCMOCK_BACKEND=gmock
-	$(MAKE) --directory $@ CCMOCK_BACKEND=fff
+#
+# Setting terminal colors
+#
+ifneq ($(MAKEFILE_COLOR), 0)
 
-scripts: scripts/Makefile
-	$(MAKE) --directory $@
+red			:= \e[1;31m
+green		:= \e[1;32m
+yellow		:= \e[1;33m
+blue		:= \e[1;34m
+magenta		:= \e[1;35m
+cyan		:= \e[1;36m
+reset		:= \e[0m
 
-clean:
-	$(MAKE) --directory basic clean
-	$(MAKE) --directory zlib-ng clean
-	$(MAKE) --directory scripts clean
+endif
+
+all: config
+
+config: $(CCMOCK) config.sh gmock.yaml clang.yaml
+	@printf "$(magenta)Running [ $@ ]$(reset)\n"
+	bash config.sh $(CCMOCK)
 
 
 .PHONY: \
-	all \
-	clean \
-	basic \
-	zlib-ng \
-	scripts
+	config

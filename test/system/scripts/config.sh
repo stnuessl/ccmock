@@ -89,6 +89,35 @@ function validate_mocking_section() {
     fi
 }
 
+function validate_clang_section() {
+    local result="$1"
+
+    if ! echo "${result}" | grep "/usr/share" > /dev/null; then
+        echo "error: \"ResourceDirectory\": invalid value"
+        exit 1
+    fi
+
+    if ! echo "${result}" | grep -e "-DMY_MACRO1" > /dev/null; then
+        echo "error: \"-DMY_MACRO1\": missing value"
+        exit 1
+    fi
+
+    if ! echo "${result}" | grep -e "-DMY_MACRO2" > /dev/null; then
+        echo "error: \"-DMY_MACRO2\": missing value"
+        exit 1
+    fi
+
+    if ! echo "${result}" | grep -e "-fno-color-diagnostics" > /dev/null; then
+        echo "error: \"-fno-color-diagnostics\": missing value" 
+        exit 1
+    fi
+
+    if ! echo "${result}" | grep -e "-pedantic" > /dev/null; then
+        echo "error: \"-pedantic\": missing value" 
+        exit 1
+    fi
+}
+
 if [[ ! -f "${CCMOCK}" ]]; then
     echo "error: \${CCMOCK}: invalid argument"
     exit 1
@@ -104,3 +133,15 @@ validate_gmock_section "${result}"
 
 result="$(${CCMOCK} --config=mocking.yaml --dump-config)"
 validate_mocking_section "${result}"
+
+result="$(${CCMOCK} --config=clang.yaml --dump-config)"
+validate_clang_section "${result}"
+
+result="$( \
+    CCMOCK_CONFIG=gmock.yaml \
+    ${CCMOCK} --config=clang.yaml,mocking.yaml --dump-config \
+)"
+
+validate_gmock_section "${result}"
+validate_mocking_section "${result}"
+validate_clang_section "${result}"

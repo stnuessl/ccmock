@@ -15,25 +15,19 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef DECL_HPP_
-#define DECL_HPP_
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#include <clang/AST/Decl.h>
-#include <clang/AST/DeclCXX.h>
+void app_print(const char *fmt, ...);
+int app_main(int argc, char *argv[]);
 
-namespace util {
-namespace decl {
-
-inline bool isGlobalFunction(const clang::FunctionDecl *Decl)
-{
-    return !clang::isa<clang::CXXMethodDecl>(Decl) && Decl->isGlobal();
+#ifdef __cplusplus
 }
+#endif
 
-clang::VarDecl *fakeVarDecl(clang::ASTContext &Context,
-                            clang::QualType Type,
-                            llvm::StringRef Name);
+#include "app.inc"
 
-} /* namespace decl */
-} /* namespace util */
-
-#endif /* DECL_HPP_ */
+TEST(main, basic)
+{
+}

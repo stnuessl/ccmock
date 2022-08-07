@@ -27,18 +27,27 @@
 
 class Config {
 public:
-    enum UseColorType {
-        AUTO = 0,
-        NEVER,
-        ALWAYS,
+    enum ColorMode {
+        COLORMODE_AUTO = 0,
+        COLORMODE_NEVER,
+        COLORMODE_ALWAYS,
+    };
+
+    enum Backend {
+        BACKEND_GMOCK,
+        BACKEND_FFF,
     };
 
     struct ClangSection {
     public:
         ClangSection();
 
+        std::filesystem::path CompileCommands;
         std::vector<std::string> ExtraArguments;
+        std::vector<std::string> RemoveArguments;
         std::filesystem::path ResourceDirectory;
+
+        unsigned int CompileCommandIndex;
     };
 
     struct GeneralSection {
@@ -46,12 +55,10 @@ public:
         GeneralSection();
 
         std::filesystem::path BaseDirectory;
-        std::filesystem::path CompileCommands;
         std::filesystem::path Input;
         std::filesystem::path Output;
 
-        unsigned int CompileCommandIndex;
-        enum UseColorType UseColor;
+        enum ColorMode ColorMode;
 
         bool Quiet;
         bool Verbose;
@@ -74,10 +81,22 @@ public:
 
         std::vector<std::string> Blacklist;
 
+        enum Backend Backend;
+
         bool MockBuiltins;
         bool MockCStdLib;
         bool MockCXXStdLib;
         bool MockVariadicFunctions;
+    };
+
+    struct FFFSection {
+    public:
+        FFFSection();
+
+        std::string CallingConvention;
+        std::string GCCFunctionAttributes;
+        int ArgHistoryLen;
+        int CallHistoryLen;
     };
 
     Config();
@@ -90,6 +109,7 @@ public:
     GMockSection GMock;
     GeneralSection General;
     MockingSection Mocking;
+    FFFSection FFF;
 };
 
 #endif /* CONFIG_HPP_ */

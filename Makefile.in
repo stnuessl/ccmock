@@ -107,7 +107,7 @@ artifactory_upload_url := \
 	;branch=$(notdir $(GITHUB_REF))$\
 	;uuid=$(shell uuidgen --random)$\
 	;commit=$(GITHUB_SHA)$\
-	;compiler=$(shell $(CC) --version | head -n 1 | tr -s " " "+")$\
+	;compiler=$(shell $(CXX) --version | head -n 1 | tr -s " " "+")$\
 	;date=$(date)$\
 	;time=$(time)$\
 	;timezone=utc$\
@@ -115,7 +115,7 @@ artifactory_upload_url := \
 	;os=$(os_name)$\
 	;version=$(version_core)$\
 	/$(os_name)$\
-	/$(notdir $(CC))$\
+	/$(notdir $(CXX))$\
 	/$(date)$\
 	/$(time)
 
@@ -506,6 +506,7 @@ $(ut_tests): LDLIBS		+= -lgcov
 endif
 endif
 
+systest_results := build/system-tests/results
 
 #
 # Setting terminal colors
@@ -664,7 +665,10 @@ $(ut_dir)/%.$(OBJ_SUFFIX): %.cpp
 	@printf "$(blue)Building [ $@ ]$(reset)\n"
 	$(Q)gcc -c -o $@ $(CPPFLAGS) $(CFLAGS) $<
 
-system-tests: $(release_bin)
+
+system-tests: $(systest_results)
+
+$(systest_results): $(release_bin)
 	$(MAKE) --directory test/system
 
 clean:
@@ -754,6 +758,7 @@ $(tarball): \
 		$(os_release) \
 		$(pkgconf_data) \
 		$(shellcheck_output) \
+		$(systest_results) \
 		$(ut_reports) \
 		$(ut_cov) \
 		$(version_file)
@@ -787,6 +792,7 @@ endif
 	$(envfile) \
 	$(pkgconf_check) \
 	$(shellcheck) \
+	$(systest_results) \
 	$(ut_target) \
 	all \
 	artifactory-upload \

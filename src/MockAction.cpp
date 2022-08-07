@@ -15,15 +15,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <filesystem>
-
-#include <clang/Frontend/CompilerInstance.h>
-
-#include "GMockGenerator.hpp"
 #include "MockAction.hpp"
 
-#include <llvm/Support/raw_ostream.h>
+#include <clang/Frontend/CompilerInstance.h>
+#include <filesystem>
 
+#include "FFF.hpp"
+#include "GMock.hpp"
 #include "util/commandline.hpp"
 
 namespace {
@@ -61,9 +59,18 @@ MockAction::CreateASTConsumer(clang::CompilerInstance &CI, llvm::StringRef File)
     (void) File;
 
     auto Policy = clang::PrintingPolicy(CI.getLangOpts());
-    auto Generator = std::make_unique<GMockGenerator>(Config_, Policy);
 
-    return Generator;
+    switch (Config_->Mocking.Backend) {
+    case Config::BACKEND_GMOCK:
+        return std::make_unique<GMock>(Config_, Policy);
+    case Config::BACKEND_FFF:
+        return std::make_unique<FFF>(Config_, Policy);
+    default:
+        llvm_unreachable("invalid mocking backend");
+        break;
+    }
+
+    return nullptr;
 }
 
 bool MockAction::PrepareToExecuteAction(clang::CompilerInstance &CI)

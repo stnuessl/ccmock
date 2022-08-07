@@ -7,6 +7,12 @@
     },
     {
         "directory": "${PROJECT_DIRECTORY}",
+        "file": "src/callback.c",
+        "output": "src/callback.o",
+        "arguments": ["clang", "-c", "-o", "src/callback.o", "-std=c11", "-I", "src", "src/callback.c"]
+    },
+    {
+        "directory": "${PROJECT_DIRECTORY}",
         "file": "src/fac.c",
         "output": "src/fac.o",
         "arguments": ["clang", "-c", "-o", "src/fac.o", "-std=c11", "-I", "src", "src/fac.c"]

@@ -8,10 +8,12 @@
 FROM archlinux:base
 RUN pacman -Syu --noconfirm \
     clang \
+    cmake \
     cppcheck \
     ctags \
     findutils \
     gcc \
+    git \
     gtest \
     lcov \
     llvm \

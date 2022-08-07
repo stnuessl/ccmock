@@ -23,7 +23,7 @@
 
 #include <clang/Tooling/CompilationDatabase.h>
 
-/* 
+/*
  * Adapter class which allows to exactly control which compile command is used
  * to process a source file in case multiple commands are available.
  */

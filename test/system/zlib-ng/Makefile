@@ -22,18 +22,55 @@
 # THE SOFTWARE.
 #
 
-SHELL	:= bash -o pipefail
+CCMOCK := ../../../build/release/ccmock
+CCMOCK_BACKEND := gmock
+BUILD_DIR := ../../../build/system-tests/zlib-ng
+RESULT_DIR := ../../../build/system-tests/results/zlib-ng
 
+SHELL	:= bash -o pipefail
 CC		:= gcc
 CXX		:= gcc
 LD		:= gcc
-CCMOCK	:= ./../../../build/release/ccmock
 
-Q	:= @
+Q :=
 
-srcdir		:= src
-testdir		:= tests
-BUILD_DIR	:= build
+srcdir := $(BUILD_DIR)/src
+ut_srcdir := $(CCMOCK_BACKEND)
+
+outdir := $(BUILD_DIR)/$(srcdir)
+ut_outdir := $(BUILD_DIR)/$(ut_srcdir)
+
+ut_src	:= $(shell find $(ut_srcdir) -name "*.cpp")
+# Needed to automate cloning of the repository
+src		:= $(patsubst $(ut_srcdir)/%.cpp,$(srcdir)/%.c,$(ut_src))
+objs	:= $(patsubst %.c,$(BUILD_DIR)/%.o,$(src))
+ut_objs	:= $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(ut_src))
+ut_gen	:= $(patsubst %.cpp,$(RESULT_DIR)/%.inc,$(ut_src))
+ut_out	:= $(patsubst %.cpp,$(RESULT_DIR)/%.xml,$(ut_src))
+
+compile_commands := $(BUILD_DIR)/build/compile_commands.json
+
+
+#
+# Define include directories
+#
+ut_inc := \
+	-I$(dir $(compile_commands)) \
+	$(patsubst %,-I%,$(sort $(dir $(ut_out))))
+
+ifeq ($(CCMOCK_BACKEND),fff)
+ut_inc += -I../common/include
+endif
+
+
+#
+# Define required directories
+#
+dirs := \
+	$(sort $(dir $(objs))) \
+	$(sort $(dir $(ut_objs))) \
+	$(sort $(dir $(ut_out)))
+
 
 # Retrieved from the generated compilation database
 CPPFLAGS	:= \
@@ -63,18 +100,38 @@ CPPFLAGS	:= \
 	-DZLIB_DLL \
 	-D_LARGEFILE64_SOURCE=1 \
 	-D__USE_LARGEFILE64 \
-	-I$(BUILD_DIR)/ \
+	$(shell pkgconf --cflags gtest) \
+	-I$(BUILD_DIR)/build \
 	-I$(srcdir)/
 
-CFLAGS		:= -std=c99 -O2 $(shell pkgconf --cflags gmock gtest)
-CXXFLAGS	:= $(shell pkgconf --cflags gmock gtest)
-LDFLAGS		:= -lstdc++ $(shell pkgconf --libs gmock gtest)
+CFLAGS		:= -Wall -std=c99 -O2
+CXXFLAGS	:= -Wall -std=c++17 -O2
+LDFLAGS		:= -lstdc++
 
-ut_src		:= $(shell find $(testdir) -name "*.cpp")
-ut_reports	:= $(patsubst %.cpp,%.xml,$(ut_src))
+ifeq ($(CCMOCK_BACKEND),gmock)
+CFLAGS		+= $(shell pkgconf --cflags gmock gtest)
+LDFLAGS		+= $(shell pkgconf --libs gmock gtest)
+else
+CFLAGS		+= $(shell pkgconf --cflags gtest)
+LDFLAGS		+= $(shell pkgconf --libs gtest)
+endif
 
-# Needed to automate cloning of the repository
-src			:= $(patsubst $(testdir)/%.cpp,$(srcdir)/%.c,$(ut_src))
+
+#
+# Setting terminal colors
+#
+
+ifneq ($(MAKEFILE_COLOR), 0)
+
+red			:= \e[1;31m
+green		:= \e[1;32m
+yellow		:= \e[1;33m
+blue		:= \e[1;34m
+magenta		:= \e[1;35m
+cyan		:= \e[1;36m
+reset		:= \e[0m
+
+endif
 
 # Disable all implicit rules
 .SUFFIXES:
@@ -82,49 +139,71 @@ src			:= $(patsubst $(testdir)/%.cpp,$(srcdir)/%.c,$(ut_src))
 # Keep intermediate build files
 .SECONDARY:
 
-all: $(ut_reports)
 
-$(testdir)/%.xml: $(testdir)/%.out
-	@printf "  %-6s %s\n" "RUN" "$@"
-	$(Q)./$< --gtest_output=xml:$@ > /dev/null
+all: $(ut_out)
 
-$(testdir)/%.out: $(srcdir)/%.o $(testdir)/%.o
-	@printf "  %-6s %s\n" "LD" "$@"
+$(RESULT_DIR)/%.xml: $(BUILD_DIR)/%.out
+	@printf "$(green)Executing [ $< ]$(reset)\n"
+ifeq ($(Q),@)
+	$(Q)./$< --gtest_output=xml:$@ > /dev/null 2>&1
+else
+	$(Q)./$< --gtest_output=xml:$@
+endif
+
+$(ut_outdir)/%.out: $(ut_outdir)/%.o $(outdir)/%.o
+	@printf "$(yellow)Linking [ $@ ]$(reset)\n"
 	$(Q)$(LD) -o $@ $^ $(CXXFLAGS) $(LDFLAGS)
 
-$(testdir)/%.o: $(testdir)/%.cpp $(testdir)/%.inc
-	@printf "  %-6s %s\n" "CXX" "$@"
-	$(Q)$(CC) -c -o $@ $< $(CPPFLAGS) $(CXXFLAGS)
+# As the cmake configuration generates some required header dependencies,
+# we use the compilation database to synchronize
+$(outdir)/%.o: $(srcdir)/%.c $(compile_commands)
+	@printf "$(blue)Building [ $@ ]$(reset)\n"
+	$(Q)$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $<
 
-$(srcdir)/%.o: $(srcdir)/%.c $(BUILD_DIR)/compile_commands.json
-	@printf "  %-6s %s\n" "CC" "$@"
-	$(Q)$(CC) -c -o $@ $< $(CPPFLAGS) $(CFLAGS)
+$(ut_outdir)/%.o: $(ut_srcdir)/%.cpp $(RESULT_DIR)/$(CCMOCK_BACKEND)/%.inc
+	@printf "$(blue)Building [ $@ ]$(reset)\n"
+	$(Q)$(CC) -c -o $@ $(CPPFLAGS) $(ut_inc) $(CXXFLAGS) $<
 
-$(src): $(srcdir)
-
-$(testdir)/%.inc: $(srcdir)/%.c $(BUILD_DIR)/compile_commands.json
-	@printf "  %-6s %s\n" "MOCK" "$@"
+$(RESULT_DIR)/$(CCMOCK_BACKEND)/%.inc: $(srcdir)/%.c $(compile_commands)
+	@printf "$(cyan)Generating [ $@ ]$(reset)\n"
 	$(Q)$(CCMOCK) \
 		-o $@ \
-		--compile-commands=$(BUILD_DIR)/compile_commands.json \
+		--compile-commands $(compile_commands) \
+		--backend $(CCMOCK_BACKEND) \
 		$<
 
-$(BUILD_DIR)/compile_commands.json: $(srcdir)
-	@printf "  %-6s %s\n" "CONF" "$@"
-	$(Q)cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -S $(srcdir) -B $(BUILD_DIR) \
-		> /dev/null
+$(src): | $(srcdir)
+
+$(compile_commands): | $(srcdir)
+	@printf "$(magenta)Configuring [ $@ ]$(reset)\n"
+	$(Q)cmake \
+		-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+		-S $(srcdir) \
+		-B $(@D) \
+		> /dev/null || (rm -f $@ || false)
 
 $(srcdir):
-	@printf "  %-6s %s\n" "CLONE" "$@"
+	@printf "$(magenta)Downloading [ $@ ]$(reset)\n"
+ifeq ($(Q),@)
 	@git clone --quiet https://github.com/zlib-ng/zlib-ng $@
 	@cd $@ && git checkout tags/2.0.6 -b ccmock_test > /dev/null 2>&1
+else
+	@git clone https://github.com/zlib-ng/zlib-ng $@
+	@cd $@ && git checkout tags/2.0.6 -b ccmock_test
+endif
+
+$(ut_out) $(ut_gen) $(objs) $(ut_objs) $(compile_commands): | $(dirs)
+
+$(dirs):
+	mkdir -p $@
 
 clean:
-	rm -rf \
-		$(testdir)/*.inc \
-		$(testdir)/*.o \
-		$(testdir)/*.out \
-		$(testdir)/*.xml \
-		$(srcdir)/*.o \
-		$(BUILD_DIR)
+	rm -rf $(BUILD_DIR) $(RESULT_DIR)
 
+.PHONY: \
+	all \
+	clean
+
+.SILENT: \
+	$(dirs) \
+	clean

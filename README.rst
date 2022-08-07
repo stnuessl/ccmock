@@ -6,8 +6,7 @@ ccmock (Work in Progress)
    :alt: CI
    :target: https://github.com/stnuessl/ccmock/actions
 
-Automatic mock creation for unit tests in C and C++ using Google's 
-`gtest and gmock <https://google.github.io/googletest/>`_.
+Automatic mock creation for unit tests in C and C++.
 
 .. contents::
 
@@ -32,6 +31,12 @@ to be able to parse a project's source files.
 
 Features
 ========
+
+* Automatic detection which functions need to be mocked.
+* Blacklist entries
+* Supported frameworks:
+  * `gmock <https://google.github.io/googletest/>`_
+  * `fff <https://github.com/meekrosoft/fff#fake-function-framework--fff>`_
 
 Installation
 ============
@@ -120,11 +125,11 @@ General Idea
 #. Focus on writing unit test code.
    
 
-Examples
+Commands
 --------
 
-Get Help Message
-^^^^^^^^^^^^^^^^
+Help Message
+^^^^^^^^^^^^
 
 .. code:: sh
 
@@ -215,9 +220,18 @@ Best Practices
   as doing so will very likey break your unit test library in unpredictable
   ways.
 
+Examples
+========
+
+Explore the `test/system <test/system>`_ directory to see how ccmock can be
+integrated into a build system for automatic mock generation.
+
 Open Points
 ===========
 
 * Mocking C++ is not implemented
 * Fake Function Framework generator not implemented
+* Generate global variable definitions
+* Restructure test tree
+* Automatic include handling
 

@@ -44,13 +44,22 @@ public:
     }
 };
 
-template <> struct ScalarEnumerationTraits<Config::UseColorType> {
+template <> struct ScalarEnumerationTraits<Config::ColorMode> {
 public:
-    static void enumeration(IO &io, Config::UseColorType &Value)
+    static void enumeration(IO &io, Config::ColorMode &Value)
     {
-        io.enumCase(Value, "auto", Config::UseColorType::AUTO);
-        io.enumCase(Value, "never", Config::UseColorType::NEVER);
-        io.enumCase(Value, "always", Config::UseColorType::ALWAYS);
+        io.enumCase(Value, "auto", Config::COLORMODE_AUTO);
+        io.enumCase(Value, "never", Config::COLORMODE_NEVER);
+        io.enumCase(Value, "always", Config::COLORMODE_ALWAYS);
+    }
+};
+
+template <> struct ScalarEnumerationTraits<Config::Backend> {
+public:
+    static void enumeration(IO &io, Config::Backend &Value)
+    {
+        io.enumCase(Value, "gmock", Config::BACKEND_GMOCK);
+        io.enumCase(Value, "fff", Config::BACKEND_FFF);
     }
 };
 
@@ -58,8 +67,12 @@ template <> struct MappingTraits<Config::ClangSection> {
 public:
     static void mapping(llvm::yaml::IO &IO, Config::ClangSection &Section)
     {
+        IO.mapOptional("CompileCommands", Section.CompileCommands);
         IO.mapOptional("ExtraArguments", Section.ExtraArguments);
+        IO.mapOptional("RemoveArguments", Section.RemoveArguments);
         IO.mapOptional("ResourceDirectory", Section.ResourceDirectory);
+
+        IO.mapOptional("CompileCommandIndex", Section.CompileCommandIndex);
     }
 
     static std::string validate(llvm::yaml::IO &IO,
@@ -123,12 +136,10 @@ public:
     static void mapping(llvm::yaml::IO &IO, Config::GeneralSection &Section)
     {
         IO.mapOptional("BaseDirectory", Section.BaseDirectory);
-        IO.mapOptional("CompileCommands", Section.CompileCommands);
         IO.mapOptional("Input", Section.Input);
         IO.mapOptional("Output", Section.Output);
 
-        IO.mapOptional("CompileCommandIndex", Section.CompileCommandIndex);
-        IO.mapOptional("UseColor", Section.UseColor);
+        IO.mapOptional("ColorMode", Section.ColorMode);
 
         IO.mapOptional("Quiet", Section.Quiet);
         IO.mapOptional("Verbose", Section.Verbose);
@@ -150,10 +161,22 @@ public:
     static void mapping(llvm::yaml::IO &IO, Config::MockingSection &Section)
     {
         IO.mapOptional("Blacklist", Section.Blacklist);
+        IO.mapOptional("Backend", Section.Backend);
         IO.mapOptional("MockBuiltins", Section.MockBuiltins);
         IO.mapOptional("MockCStdLib", Section.MockCStdLib);
         IO.mapOptional("MockC++StdLib", Section.MockCXXStdLib);
         IO.mapOptional("MockVariadicFunctions", Section.MockVariadicFunctions);
+    }
+};
+
+template <> struct MappingTraits<Config::FFFSection> {
+public:
+    static void mapping(llvm::yaml::IO &IO, Config::FFFSection &Section)
+    {
+        IO.mapOptional("CallingConvention", Section.CallingConvention);
+        IO.mapOptional("GCCFunctionAttributes", Section.GCCFunctionAttributes);
+        IO.mapOptional("ArgHistoryLen", Section.ArgHistoryLen);
+        IO.mapOptional("CallHistoryLen", Section.CallHistoryLen);
     }
 };
 
@@ -165,13 +188,19 @@ public:
         IO.mapOptional("GMock", Config.GMock);
         IO.mapOptional("General", Config.General);
         IO.mapOptional("Mocking", Config.Mocking);
+        IO.mapOptional("FFF", Config.FFF);
     }
 };
 
 } // namespace yaml
 } // namespace llvm
 
-Config::ClangSection::ClangSection() : ExtraArguments(), ResourceDirectory()
+Config::ClangSection::ClangSection()
+    : CompileCommands(),
+      ExtraArguments(),
+      RemoveArguments(),
+      ResourceDirectory(),
+      CompileCommandIndex(0)
 {
 }
 
@@ -185,11 +214,9 @@ Config::GMockSection::GMockSection()
 
 Config::GeneralSection::GeneralSection()
     : BaseDirectory(),
-      CompileCommands(),
       Input(),
       Output(),
-      CompileCommandIndex(0),
-      UseColor(Config::UseColorType::AUTO),
+      ColorMode(Config::COLORMODE_AUTO),
       Quiet(false),
       Verbose(false),
       WriteDate(true)
@@ -198,6 +225,7 @@ Config::GeneralSection::GeneralSection()
 
 Config::MockingSection::MockingSection()
     : Blacklist(),
+      Backend(Config::BACKEND_GMOCK),
       MockBuiltins(false),
       MockCStdLib(false),
       MockCXXStdLib(false),
@@ -205,7 +233,15 @@ Config::MockingSection::MockingSection()
 {
 }
 
-Config::Config() : Clang(), GMock(), General(), Mocking()
+Config::FFFSection::FFFSection()
+    : CallingConvention(),
+      GCCFunctionAttributes(),
+      ArgHistoryLen(-1),
+      CallHistoryLen(-1)
+{
+}
+
+Config::Config() : Clang(), GMock(), General(), Mocking(), FFF()
 {
 }
 

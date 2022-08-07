@@ -24,42 +24,35 @@
 #include "util/Glob.hpp"
 #include "util/commandline.hpp"
 
-ASTVisitor::ASTVisitor()
-    : Buffer_(),
-      Config_(),
+static const llvm::StringMap<int> InternalBlacklist = {
+    {"environ", 0},
+    {"stdin", 0},
+    {"stdout", 0},
+    {"stderr", 0},
+    {"std::cin", 0},
+    {"std::wcin", 0},
+    {"std::cout", 0},
+    {"std::wcout", 0},
+    {"std::cerr", 0},
+    {"std::wcerr", 0},
+};
+
+ASTVisitor::ASTVisitor(std::shared_ptr<const Config> Config,
+                       clang::ASTContext &Context)
+    : Config_(std::move(Config)),
+      Buffer_(),
       GlobBlacklist_(),
-      FunctionDeclMap_(),
-      Blacklist_(),
-      SourceManager_()
+      Visited_(64),
+      Result_(),
+      Blacklist_(32),
+      SourceManager_(&Context.getSourceManager())
 {
     Buffer_.reserve(256);
-    FunctionDeclMap_.reserve(256);
-    Blacklist_.reserve(64);
-}
-
-void ASTVisitor::setConfig(std::shared_ptr<const Config> Config)
-{
-    Config_ = std::move(Config);
-
-    /* TODO: shamelessly stolen from clang-rename */
-#if 0
-      // Check if NewNames is a valid identifier in C++17.
-  LangOptions Options;
-  Options.CPlusPlus = true;
-  Options.CPlusPlus17 = true;
-  IdentifierTable Table(Options);
-  for (const auto &NewName : NewNames) {
-    auto NewNameTokKind = Table.get(NewName).getTokenID();
-    if (!tok::isAnyIdentifier(NewNameTokKind)) {
-      errs() << "ERROR: new name is not a valid identifier in C++17.\n\n";
-      return 1;
-    }
-  }
-#endif
+    Result_.Decls.reserve(64);
 
     for (const auto &Name : Config_->Mocking.Blacklist) {
         if (!util::glob::isPattern(Name)) {
-            Blacklist_.insert(Name);
+            Blacklist_.insert({Name, 0});
             continue;
         }
 
@@ -75,6 +68,28 @@ void ASTVisitor::setConfig(std::shared_ptr<const Config> Config)
     }
 }
 
+#if 0
+void ASTVisitor::setConfig(std::shared_ptr<const Config> Config)
+{
+    Config_ = std::move(Config);
+
+    /* TODO: shamelessly stolen from clang-rename */
+      // Check if NewNames is a valid identifier in C++17.
+  LangOptions Options;
+  Options.CPlusPlus = true;
+  Options.CPlusPlus17 = true;
+  IdentifierTable Table(Options);
+  for (const auto &NewName : NewNames) {
+    auto NewNameTokKind = Table.get(NewName).getTokenID();
+    if (!tok::isAnyIdentifier(NewNameTokKind)) {
+      errs() << "ERROR: new name is not a valid identifier in C++17.\n\n";
+      return 1;
+    }
+  }
+
+}
+#endif
+
 bool ASTVisitor::VisitCallExpr(clang::CallExpr *CallExpr)
 {
     doVisitCallExpr(CallExpr);
@@ -89,18 +104,11 @@ bool ASTVisitor::VisitCXXConstructExpr(clang::CXXConstructExpr *ConstructExpr)
     return true;
 }
 
-std::vector<const clang::FunctionDecl *> ASTVisitor::takeFunctionDecls()
+bool ASTVisitor::VisitDeclRefExpr(clang::DeclRefExpr *DeclRefExpr)
 {
-    std::vector<const clang::FunctionDecl *> Vector;
+    doVisitDeclRefExpr(DeclRefExpr);
 
-    Vector.reserve(FunctionDeclMap_.size());
-
-    for (auto &&Item : FunctionDeclMap_)
-        Vector.push_back(std::move(Item.second));
-
-    FunctionDeclMap_.clear();
-
-    return Vector;
+    return true;
 }
 
 void ASTVisitor::dispatch(const clang::Expr *Expr,
@@ -108,10 +116,14 @@ void ASTVisitor::dispatch(const clang::Expr *Expr,
 {
     llvm::raw_string_ostream OS(Buffer_);
 
-    if (!SourceManager_->isInMainFile(Expr->getExprLoc()))
+    /*
+     * Call expressions via function pointers don't have a function
+     * declaration associated with them.
+     */
+    if (!Decl)
         return;
 
-    if (!Decl)
+    if (!SourceManager_->isInMainFile(Expr->getExprLoc()))
         return;
 
     if (Decl->isStatic())
@@ -135,14 +147,13 @@ void ASTVisitor::dispatch(const clang::Expr *Expr,
      * Deal with builtin functions which might refer to compiler builtins
      * like "__builtin_expect" or standard library functions.
      */
-    auto BuiltinID = Decl->getBuiltinID();
-    if (BuiltinID) {
+    if (Decl->getBuiltinID()) {
         auto Name = Decl->getName();
 
         /* Non standard library builtins */
         if (Name.startswith("__builtin_") && !Config_->Mocking.MockBuiltins) {
             if (Config_->General.Verbose) {
-                llvm::errs() << util::cl::info() << "ignoring builtin \""
+                llvm::errs() << util::cl::info() << "skipping builtin \""
                              << Name << "\"\n";
             }
 
@@ -153,7 +164,7 @@ void ASTVisitor::dispatch(const clang::Expr *Expr,
         if (Decl->isInStdNamespace() && !Config_->Mocking.MockCXXStdLib) {
             if (Config_->General.Verbose) {
                 llvm::errs() << util::cl::info()
-                             << "ignoring C++ standard library function \"";
+                             << "skipping C++ standard library function \"";
                 Decl->printQualifiedName(llvm::errs());
                 llvm::errs() << "\"\n";
             }
@@ -165,7 +176,7 @@ void ASTVisitor::dispatch(const clang::Expr *Expr,
         if (!Config_->Mocking.MockCStdLib) {
             if (Config_->General.Verbose) {
                 llvm::errs() << util::cl::info()
-                             << "ignoring C standard library function \"";
+                             << "skipping C standard library function \"";
                 Decl->printQualifiedName(llvm::errs());
                 llvm::errs() << "\"\n";
             }
@@ -179,7 +190,7 @@ void ASTVisitor::dispatch(const clang::Expr *Expr,
 
     if (Blacklist_.count(Buffer_)) {
         if (Config_->General.Verbose) {
-            llvm::errs() << util::cl::info() << "ignoring \"" << Buffer_
+            llvm::errs() << util::cl::info() << "skipping \"" << Buffer_
                          << "\" due to blacklist entry\n";
         }
         return;
@@ -209,22 +220,30 @@ void ASTVisitor::dispatch(const clang::Expr *Expr,
 
             std::exit(EXIT_FAILURE);
         }
+
+        Result_.AnyVariadic = true;
     }
 
+    add(Decl);
+}
+
+void ASTVisitor::add(const clang::DeclaratorDecl *Decl)
+{
     auto ID = Decl->getID();
 
-    if (FunctionDeclMap_.count(ID))
+    if (Visited_.count(ID))
         return;
 
-    auto [it, ok] = FunctionDeclMap_.insert({ID, Decl});
+    auto [_, ok] = Visited_.insert(ID);
     if (!ok) {
         llvm::errs() << util::cl::error() << ": ";
         Decl->printQualifiedName(llvm::errs());
-
         llvm::errs() << ": failed to save function for further processing\n";
 
         std::exit(EXIT_FAILURE);
     }
+
+    Result_.Decls.push_back(Decl);
 }
 
 void ASTVisitor::doVisitCallExpr(const clang::CallExpr *CallExpr)
@@ -240,4 +259,40 @@ void ASTVisitor::doVisitCXXConstructExpr(
     auto Decl = ConstructExpr->getConstructor();
 
     dispatch(ConstructExpr, Decl);
+}
+
+void ASTVisitor::doVisitDeclRefExpr(const clang::DeclRefExpr *DeclRefExpr)
+{
+    llvm::raw_string_ostream OS(Buffer_);
+
+    auto Decl = clang::dyn_cast<clang::VarDecl>(DeclRefExpr->getDecl());
+    if (!Decl)
+        return;
+
+    if (!SourceManager_->isInMainFile(DeclRefExpr->getExprLoc()))
+        return;
+
+    if (Decl->getDefinition())
+        return;
+
+    Buffer_.clear();
+    Decl->printQualifiedName(OS);
+
+    if (InternalBlacklist.count(Buffer_)) {
+        if (Config_->General.Verbose) {
+            llvm::errs() << util::cl::info() << "skipping \"" << Buffer_
+                         << "\" due to internal blacklist entry\n";
+        }
+        return;
+    }
+
+    if (Blacklist_.count(Buffer_)) {
+        if (Config_->General.Verbose) {
+            llvm::errs() << util::cl::info() << "skipping \"" << Buffer_
+                         << "\" due to blacklist entry\n";
+        }
+        return;
+    }
+
+    add(Decl);
 }

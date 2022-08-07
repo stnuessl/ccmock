@@ -15,25 +15,30 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef DECL_HPP_
-#define DECL_HPP_
+#include "Decl.hpp"
 
-#include <clang/AST/Decl.h>
-#include <clang/AST/DeclCXX.h>
+#include <clang/AST/ASTContext.h>
 
 namespace util {
 namespace decl {
 
-inline bool isGlobalFunction(const clang::FunctionDecl *Decl)
-{
-    return !clang::isa<clang::CXXMethodDecl>(Decl) && Decl->isGlobal();
-}
-
 clang::VarDecl *fakeVarDecl(clang::ASTContext &Context,
                             clang::QualType Type,
-                            llvm::StringRef Name);
+                            llvm::StringRef Name)
+{
+    auto TranslationUnitDecl = Context.getTranslationUnitDecl();
+    auto Loc = clang::SourceLocation();
+    auto &IdInfo = Context.Idents.getOwn(Name);
 
+    return clang::VarDecl::Create(Context,
+                                  TranslationUnitDecl,
+                                  Loc,
+                                  Loc,
+                                  &IdInfo,
+                                  Type,
+                                  nullptr,
+                                  clang::StorageClass::SC_None);
 } /* namespace decl */
-} /* namespace util */
+} // namespace decl
 
-#endif /* DECL_HPP_ */
+} // namespace util

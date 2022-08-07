@@ -15,25 +15,25 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef DECL_HPP_
-#define DECL_HPP_
+#ifndef FFF_HPP_
+#define FFF_HPP_
 
-#include <clang/AST/Decl.h>
-#include <clang/AST/DeclCXX.h>
+#include "Generator.hpp"
 
-namespace util {
-namespace decl {
+class FFF : public Generator {
+public:
+    FFF(std::shared_ptr<const Config> Config, clang::PrintingPolicy Policy);
 
-inline bool isGlobalFunction(const clang::FunctionDecl *Decl)
-{
-    return !clang::isa<clang::CXXMethodDecl>(Decl) && Decl->isGlobal();
-}
+    virtual void run() override;
 
-clang::VarDecl *fakeVarDecl(clang::ASTContext &Context,
-                            clang::QualType Type,
-                            llvm::StringRef Name);
+private:
+    void writeSettings();
+    void writeIncludeDirectives();
+    void writeMacros();
+    void writeTypedefs();
+    void writeMocks();
 
-} /* namespace decl */
-} /* namespace util */
+    llvm::DenseMap<const clang::Type *, const clang::VarDecl *> TypedefMap_;
+};
 
-#endif /* DECL_HPP_ */
+#endif /* FFF_HPP_ */

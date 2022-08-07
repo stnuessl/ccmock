@@ -15,25 +15,47 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef DECL_HPP_
-#define DECL_HPP_
+#include <gtest/gtest.h>
+#include <stdarg.h>
 
-#include <clang/AST/Decl.h>
-#include <clang/AST/DeclCXX.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-namespace util {
-namespace decl {
+#include "fac.h"
 
-inline bool isGlobalFunction(const clang::FunctionDecl *Decl)
+#ifdef __cplusplus
+}
+#endif
+
+#include "fac.inc"
+
+int custom_mul(int x, int y)
 {
-    return !clang::isa<clang::CXXMethodDecl>(Decl) && Decl->isGlobal();
+    return x * y;
 }
 
-clang::VarDecl *fakeVarDecl(clang::ASTContext &Context,
-                            clang::QualType Type,
-                            llvm::StringRef Name);
+TEST(fac, basic)
+{
+    ASSERT_EQ(1, fac(0));
+    ASSERT_EQ(0, mul_fake.call_count);
 
-} /* namespace decl */
-} /* namespace util */
+    ASSERT_EQ(1, fac(1));
+    ASSERT_EQ(0, mul_fake.call_count);
 
-#endif /* DECL_HPP_ */
+    mul_fake.custom_fake = &custom_mul;
+    ASSERT_EQ(6, fac(3));
+    ASSERT_EQ(2, mul_fake.call_count);
+
+    FFF_FAKE_LIST(RESET_FAKE);
+    mul_fake.custom_fake = &custom_mul;
+    ASSERT_EQ(24, fac(4));
+    ASSERT_EQ(3, mul_fake.call_count);
+}
+
+int main(int argc, char *argv[])
+{
+    testing::InitGoogleTest(&argc, argv);
+
+    return RUN_ALL_TESTS();
+}

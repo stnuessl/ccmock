@@ -15,21 +15,31 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <gtest/gtest.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void app_print(const char *fmt, ...);
-int app_main(int argc, char *argv[]);
+#include "callback.h"
 
 #ifdef __cplusplus
 }
 #endif
 
-#include "app.inc"
+#include "callback.inc"
 
-
-TEST(main, basic)
+TEST(invoke_main, basic)
 {
+    callback_main();
 
+    ASSERT_EQ(1, callback_invoke1_fake.call_count);
+    ASSERT_EQ(1, callback_invoke2_fake.call_count);
+}
+
+int main(int argc, char *argv[])
+{
+    testing::InitGoogleTest(&argc, argv);
+
+    return RUN_ALL_TESTS();
 }

@@ -3,14 +3,7 @@
 #
 
 build/
+
 Makefile
 tags
-
-# git repository 
-test/system/zlib-ng/src/
-
-*.inc
-*.o
-*.out
 *.vim
-*.xml

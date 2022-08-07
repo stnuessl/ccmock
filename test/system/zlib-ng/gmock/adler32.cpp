@@ -19,12 +19,15 @@
 extern "C" {
 #endif
 
-#include "../src/deflate.h"
 #include "../src/functable.h"
 #include "../src/zbuild.h"
 #include "../src/zlib-ng.h"
 
-void crc_reset(deflate_state *const s);
+/*
+ * Function declarations which are not availabie via header files.
+ * Be aware that these functions need C linkage .
+ */
+uint32_t adler32_c(uint32_t adler, const unsigned char *buf, size_t len);
 
 #ifdef __cplusplus
 }
@@ -35,49 +38,11 @@ void crc_reset(deflate_state *const s);
 #undef Assert
 #endif
 
-#include "crc32.inc"
+#include "adler32.inc"
 
-struct functable_s functable;
-
-int x86_cpu_has_pclmulqdq;
-
-TEST(crc_reset, 001)
+TEST(adler32_c, 001)
 {
-    deflate_state state;
-    PREFIX3(stream) strm;
+    functable.adler32 = &adler32_c;
 
-    state.strm = &strm;
-    state.strm->adler = ~0;
-
-#ifdef X86_PCLMULQDQ_CRC
-    x86_cpu_has_pclmulqdq = 1;
-
-    EXPECT_CALL(mock, x86_check_features()).Times(1);
-
-    EXPECT_CALL(mock, crc_fold_init(&state))
-        .WillOnce(testing::Assign(&state.strm->adler, 0));
-#endif
-
-    crc_reset(&state);
-
-    ASSERT_EQ(0, state.strm->adler);
-}
-
-TEST(crc_reset, 002)
-{
-    deflate_state state;
-    PREFIX3(stream) strm;
-
-    state.strm = &strm;
-    state.strm->adler = ~0;
-
-#ifdef X86_PCLMULQDQ_CRC
-    x86_cpu_has_pclmulqdq = 0;
-
-    EXPECT_CALL(mock, x86_check_features()).Times(1);
-#endif
-
-    crc_reset(&state);
-
-    ASSERT_EQ(0, state.strm->adler);
+    ASSERT_EQ(1, adler32_c(0, nullptr, 0));
 }

@@ -22,6 +22,11 @@
 # THE SOFTWARE.
 #
 
+CCMOCK := ../../../build/release/ccmock
+CCMOCK_BACKEND := gmock
+BUILD_DIR := ../../../build/system-tests/basic
+RESULT_DIR := ../../../build/system-tests/results/basic
+
 export PROJECT_DIRECTORY := $(CURDIR)
 
 SHELL	:= bash -o pipefail
@@ -29,23 +34,78 @@ CC		:= clang
 CXX		:= clang
 LD		:= clang
 
-src		:= $(shell find src -name "*.c")
-obj		:= $(patsubst %.c,%.o,$(src))
-ut_src	:= $(shell find test -name "*.cpp")
-ut_obj	:= $(patsubst %.cpp,%.o,$(ut_src))
-ut_gen	:= $(patsubst src/%.c,test/%.inc,$(src))
-ut_bin	:= $(patsubst %.cpp,%.out,$(ut_src))
-ut_out	:= $(patsubst %.cpp,%.xml,$(ut_src))
+Q :=
 
-CPPFLAGS	:= $(shell pkg-config --cflags gmock gtest)
-CFLAGS		:=
-CXXFLAGS	:= -std=c++11
-LDLIBS		:= -lstdc++ $(shell pkg-config --libs gmock gtest)
+srcdir := src
+ut_srcdir := $(CCMOCK_BACKEND)
+
+outdir := $(BUILD_DIR)/$(srcdir)
+ut_outdir := $(BUILD_DIR)/$(ut_srcdir)
+
+src		:= $(shell find $(srcdir) -name "*.c")
+ut_src	:= $(shell find $(ut_srcdir) -name "*.cpp")
+objs	:= $(patsubst %.c,$(BUILD_DIR)/%.o,$(src))
+ut_objs	:= $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(ut_src))
+ut_gen	:= $(patsubst %.cpp,$(RESULT_DIR)/%.inc,$(ut_src))
+ut_out	:= $(patsubst %.cpp,$(RESULT_DIR)/%.xml,$(ut_src))
+
+compile_commands := $(BUILD_DIR)/compile_commands.json
+
+
+#
+# Define include directories
+#
+ut_inc := \
+	-I$(srcdir) \
+	$(patsubst %,-I%,$(sort $(dir $(ut_out))))
+
+ifeq ($(CCMOCK_BACKEND),fff)
+ut_inc += -I../common/include
+endif
+
+
+#
+# Define required directories
+#
+dirs := \
+	$(sort $(dir $(objs))) \
+	$(sort $(dir $(ut_objs))) \
+	$(sort $(dir $(ut_out)))
+
+
+CPPFLAGS	:= $(shell pkgconf --cflags gtest)
+CFLAGS		:= -Wall -std=c99 -O2
+CXXFLAGS	:= -Wall -std=c++17 -O2
+LDFLAGS		:= -lstdc++
+
+ifeq ($(CCMOCK_BACKEND),gmock)
+CFLAGS		+= $(shell pkgconf --cflags gmock gtest)
+LDFLAGS		+= $(shell pkgconf --libs gmock gtest)
+else
+CFLAGS		+= $(shell pkgconf --cflags gtest)
+LDFLAGS		+= $(shell pkgconf --libs gtest)
+endif
+#
+# Setting terminal colors
+#
+
+ifneq ($(MAKEFILE_COLOR), 0)
+
+red			:= \e[1;31m
+green		:= \e[1;32m
+yellow		:= \e[1;33m
+blue		:= \e[1;34m
+magenta		:= \e[1;35m
+cyan		:= \e[1;36m
+reset		:= \e[0m
+
+endif
 
 #
 # Disable all implicit rules
 #
 .SUFFIXES:
+
 
 #
 # Prevent make from automatically removing
@@ -54,34 +114,53 @@ LDLIBS		:= -lstdc++ $(shell pkg-config --libs gmock gtest)
 .SECONDARY:
 
 
-all: tests
+all: $(ut_out)
 
-tests: $(ut_out)
+$(RESULT_DIR)/%.xml: $(BUILD_DIR)/%.out
+	@printf "$(green)Executing [ $< ]$(reset)\n"
+ifeq ($(Q),@)
+	$(Q)./$< --gtest_output=xml:$@ > /dev/null 2>&1
+else
+	$(Q)./$< --gtest_output=xml:$@
+endif
 
-%.xml: %.out
-	./$< --gtest_output=xml:$@
+$(ut_outdir)/%.out: $(ut_outdir)/%.o $(outdir)/%.o
+	@printf "$(yellow)Linking [ $@ ]$(reset)\n"
+	$(Q)$(LD) -o $@ $^ $(CXXFLAGS) $(LDFLAGS) $(LDLIBS)
 
-test/%.out: test/%.o src/%.o
-	$(LD) -o $@ $(CXXFLAGS) $(LDFLAGS) $(LDLIBS) $^
+$(outdir)/%.o: $(srcdir)/%.c
+	@printf "$(blue)Building [ $@ ]$(reset)\n"
+	$(Q)$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $<
 
-src/%.o: src/%.c
-	$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $<
+$(ut_outdir)/%.o: $(ut_srcdir)/%.cpp $(RESULT_DIR)/$(CCMOCK_BACKEND)/%.inc
+	@printf "$(blue)Building [ $@ ]$(reset)\n"
+	$(Q)$(CXX) -c -o $@ $(ut_inc) $(CPPFLAGS) $(CXXFLAGS) $<
 
-test/%.o: test/%.cpp test/%.inc
-	$(CXX) -c -o $@ -Isrc $(CPPFLAGS) $(CXXFLAGS) $<
+$(RESULT_DIR)/$(CCMOCK_BACKEND)/%.inc: $(srcdir)/%.c $(compile_commands)
+	@printf "$(cyan)Generating [ $@ ]$(reset)\n"
+	$(Q)$(CCMOCK) \
+		-o $@ \
+		--compile-commands $(compile_commands) \
+		--backend $(CCMOCK_BACKEND) \
+		$<
 
-test/%.inc: src/%.c compile_commands.json
-	./../../../build/release/ccmock -o $@ $<
+$(compile_commands): compile_commands.in
+	@printf "$(magenta)Configuring [ $@ ]$(reset)\n"
+	$(Q)envsubst "\$${PROJECT_DIRECTORY}" < $< > $@ || (rm -f $@ && false)
 
-compile_commands.json: compile_commands.in
-	envsubst "\$${PROJECT_DIRECTORY}" < $< > $@ || (rm -f $@ && false)
+$(ut_out) $(ut_gen) $(objs) $(ut_objs) $(compile_commands): | $(dirs)
+
+$(dirs):
+	mkdir -p $@
 
 clean:
-	rm -f $(obj) $(ut_obj) $(ut_bin) $(ut_out) $(ut_gen) compile_commands.json
+	rm -rf $(BUILD_DIR) $(RESULT_DIR)
 
 .PHONY: \
 	all \
 	tests \
 	clean
 
-
+.SILENT: \
+	$(dirs) \
+	clean

@@ -15,6 +15,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <gtest/gtest.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -40,11 +42,16 @@ uint32_t adler32_c(uint32_t adler, const unsigned char *buf, size_t len);
 
 #include "adler32.inc"
 
-struct functable_s functable;
-
 TEST(adler32_c, 001)
 {
     functable.adler32 = &adler32_c;
 
     ASSERT_EQ(1, adler32_c(0, nullptr, 0));
+}
+
+int main(int argc, char *argv[])
+{
+    testing::InitGoogleTest(&argc, argv);
+
+    return RUN_ALL_TESTS();
 }

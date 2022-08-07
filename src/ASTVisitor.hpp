@@ -18,54 +18,68 @@
 #ifndef AST_VISITOR_HPP_
 #define AST_VISITOR_HPP_
 
-#include <memory>
-#include <unordered_map>
-#include <unordered_set>
-#include <vector>
-
 #include <clang/AST/RecursiveASTVisitor.h>
+#include <llvm/ADT/StringSet.h>
 #include <llvm/Support/GlobPattern.h>
+#include <memory>
+#include <vector>
 
 #include "Config.hpp"
 
 class ASTVisitor : public clang::RecursiveASTVisitor<ASTVisitor> {
 public:
-    ASTVisitor();
+    struct Result {
+    public:
+        Result() = default;
 
-    inline void setSourceManager(clang::SourceManager *SourceManager);
-    void setConfig(std::shared_ptr<const Config> Config);
+        std::vector<const clang::DeclaratorDecl *> Decls;
+        bool AnyVariadic;
+    };
+
+    ASTVisitor(std::shared_ptr<const Config> Config,
+               clang::ASTContext &Context);
 
     bool VisitCallExpr(clang::CallExpr *CallExpr);
     bool VisitCXXConstructExpr(clang::CXXConstructExpr *ConstructExpr);
+    bool VisitDeclRefExpr(clang::DeclRefExpr *DeclRefExpr);
 
     inline bool shouldWalkTypesOfTypeLocs() const;
 
-    std::vector<const clang::FunctionDecl *> takeFunctionDecls();
+    inline const Result &result() const &;
+    inline Result result() &&;
 
 private:
     void dispatch(const clang::Expr *Expr,
                   const clang::FunctionDecl *FunctionDecl);
+    void add(const clang::DeclaratorDecl *Decl);
 
     void doVisitCallExpr(const clang::CallExpr *CallExpr);
     void doVisitCXXConstructExpr(const clang::CXXConstructExpr *ConstructExpr);
+    void doVisitDeclRefExpr(const clang::DeclRefExpr *DeclRefExpr);
 
-    std::string Buffer_;
     std::shared_ptr<const Config> Config_;
+    std::string Buffer_;
 
     std::vector<std::pair<llvm::StringRef, llvm::GlobPattern>> GlobBlacklist_;
-    std::unordered_map<int64_t, const clang::FunctionDecl *> FunctionDeclMap_;
-    std::unordered_set<std::string> Blacklist_;
+    llvm::DenseSet<int64_t> Visited_;
+    Result Result_;
+    llvm::StringMap<int> Blacklist_;
     clang::SourceManager *SourceManager_;
 };
-
-inline void ASTVisitor::setSourceManager(clang::SourceManager *SourceManager)
-{
-    SourceManager_ = SourceManager;
-}
 
 inline bool ASTVisitor::shouldWalkTypesOfTypeLocs() const
 {
     return false;
+}
+
+inline const ASTVisitor::Result &ASTVisitor::result() const &
+{
+    return Result_;
+}
+
+inline ASTVisitor::Result ASTVisitor::result() &&
+{
+    return std::move(Result_);
 }
 
 #endif /* AST_VISITOR_HPP_ */

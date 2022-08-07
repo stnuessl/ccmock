@@ -72,6 +72,30 @@ static llvm::cl::list<std::string> Blacklist(
     llvm::cl::cat(ToolCategory)
 );
 
+static llvm::cl::opt<Config::Backend> Backend(
+    "backend",
+    llvm::cl::desc(
+        "Select the backend to use for generating mock functions.\n"
+        "The default backend is GMock as it works with C and C++.\n"
+    ),
+    llvm::cl::values(
+        clEnumValN(
+            Config::BACKEND_GMOCK, 
+            "gmock", 
+            "Use the GMock backend."
+        ),
+        clEnumValN(
+            Config::BACKEND_FFF,
+            "fff",
+            "Use the Fake Function Framework backend."
+        )
+    ),
+    llvm::cl::value_desc("backend"),
+    llvm::cl::init(Config::BACKEND_GMOCK),
+    llvm::cl::ValueRequired,
+    llvm::cl::cat(ToolCategory)
+);
+
 static llvm::cl::opt<std::string> CompileCommands(
     "compile-commands",
     llvm::cl::desc(
@@ -198,6 +222,19 @@ static llvm::cl::opt<std::string> Output(
     llvm::cl::cat(ToolCategory)
 );
 
+static llvm::cl::list<std::string> RemoveArguments(
+    "remove-args",
+    llvm::cl::desc(
+        "Remove command-line arguments from the invocation of\n"
+        "the internally used clang compiler. Be aware that this option\n"
+        "only removes direct matches and is not aware of any value\n"
+        "dependant arguments\n"
+    ),
+    llvm::cl::value_desc("arg"),
+    llvm::cl::ValueRequired,
+    llvm::cl::cat(ToolCategory)
+);
+
 static llvm::cl::opt<std::string> ResourceDirectory(
     "resource-directory",
     llvm::cl::desc(
@@ -242,6 +279,36 @@ public:
 
 private:
     clang::tooling::CommandLineArguments ExtraArgs_;
+};
+
+class RemoveArgumentsAdjuster {
+public:
+    explicit RemoveArgumentsAdjuster(std::vector<std::string> &&RemoveArgs)
+        : RemoveArgs_(RemoveArgs.size())
+    {
+        for (auto &Arg : RemoveArgs)
+            RemoveArgs_.insert({std::move(Arg), 0});
+    }
+
+    clang::tooling::CommandLineArguments
+    operator()(const clang::tooling::CommandLineArguments &Args,
+               llvm::StringRef File)
+    {
+        (void) File;
+
+        auto AdjustedArgs = clang::tooling::CommandLineArguments();
+        AdjustedArgs.reserve(Args.size() - RemoveArgs_.size());
+
+        for (auto &Arg : Args) {
+            if (!RemoveArgs_.count(Arg))
+                AdjustedArgs.push_back(Arg);
+        }
+
+        return AdjustedArgs;
+    }
+
+private:
+    llvm::StringMap<int> RemoveArgs_;
 };
 
 __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
@@ -297,20 +364,26 @@ __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
     if (!ExtraArguments.empty())
         Config->Clang.ExtraArguments = std::move(ExtraArguments);
 
+    if (!RemoveArguments.empty())
+        Config->Clang.RemoveArguments = std::move(RemoveArguments);
+
     if (!ResourceDirectory.empty())
         Config->Clang.ResourceDirectory = std::move(ResourceDirectory);
 
     if (!BaseDirectory.empty())
         Config->General.BaseDirectory = std::move(BaseDirectory);
 
+    if (Backend.getNumOccurrences() != 0)
+        Config->Mocking.Backend = Backend;
+
     if (CompileCommandIndex.getNumOccurrences() != 0)
-        Config->General.CompileCommandIndex = CompileCommandIndex;
+        Config->Clang.CompileCommandIndex = CompileCommandIndex;
 
     if (!Blacklist.empty())
         Config->Mocking.Blacklist = std::move(Blacklist);
 
     if (CompileCommands.getNumOccurrences() != 0)
-        Config->General.CompileCommands = std::move(CompileCommands);
+        Config->Clang.CompileCommands = std::move(CompileCommands);
 
     if (Verbose.getNumOccurrences() != 0)
         Config->General.Verbose = Verbose;
@@ -350,13 +423,13 @@ __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
         Path = std::filesystem::absolute(Path);
     }
 
-    switch (Config->General.UseColor) {
-    case Config::UseColorType::AUTO:
+    switch (Config->General.ColorMode) {
+    case Config::COLORMODE_AUTO:
         break;
-    case Config::UseColorType::NEVER:
+    case Config::COLORMODE_NEVER:
         llvm::errs().enable_colors(false);
         break;
-    case Config::UseColorType::ALWAYS:
+    case Config::COLORMODE_ALWAYS:
         llvm::errs().enable_colors(true);
         break;
     default:
@@ -365,9 +438,10 @@ __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
 
     /* Prepare inputs for the invocation of the ClangTool */
     auto Commands = CompilationDatabase();
-    Commands.setIndex(CompileCommandIndex);
-    if (!Config->General.CompileCommands.empty())
-        Commands.load(Config->General.CompileCommands, Message);
+    Commands.setIndex(Config->Clang.CompileCommandIndex);
+
+    if (!Config->Clang.CompileCommands.empty())
+        Commands.load(Config->Clang.CompileCommands, Message);
     else
         Commands.detect(Config->General.Input, Message);
 
@@ -382,16 +456,24 @@ __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
         std::exit(EXIT_FAILURE);
     }
 
-    auto &Input = Config->General.Input.native();
-    auto &ExtraArgs = Config->Clang.ExtraArguments;
-    auto Adjuster = ExtraArgumentsAdjuster(std::move(ExtraArgs));
-
     auto Factory = ActionFactory();
     Factory.setConfig(Config);
 
     /* Perform the ClangTool invocation */
+    auto &Input = Config->General.Input.native();
     auto Tool = clang::tooling::ClangTool(Commands, Input);
-    Tool.appendArgumentsAdjuster(std::move(Adjuster));
+
+    auto &ExtraArgs = Config->Clang.ExtraArguments;
+    if (!ExtraArgs.empty()) {
+        auto Adjuster = ExtraArgumentsAdjuster(std::move(ExtraArgs));
+        Tool.appendArgumentsAdjuster(std::move(Adjuster));
+    }
+
+    auto &RemoveArgs = Config->Clang.RemoveArguments;
+    if (!RemoveArgs.empty()) {
+        auto Adjuster = RemoveArgumentsAdjuster(std::move(RemoveArgs));
+        Tool.appendArgumentsAdjuster(std::move(Adjuster));
+    }
 
     return Tool.run(&Factory);
 }

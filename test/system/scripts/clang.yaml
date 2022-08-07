@@ -1,0 +1,10 @@
+---
+Clang:
+  ResourceDirectory: '/usr/share'
+  ExtraArguments:
+    - '-DMY_MACRO1'
+    - '-DMY_MACRO2'
+    - '-fno-color-diagnostics'
+  RemoveArguments:
+    - '-pedantic'
+...
