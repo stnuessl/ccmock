@@ -230,8 +230,7 @@ Open Points
 ===========
 
 * Mocking C++ is not implemented
-* Fake Function Framework generator not implemented
-* Generate global variable definitions
-* Restructure test tree
+* Generate global variable definitions (how to configure this?)
 * Automatic include handling
-
+* provide multiple test runners
+* add support for another mock library (cpputest?)

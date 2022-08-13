@@ -151,7 +151,7 @@ extern "C" {
             Out_ << "FAKE_VOID_FUNC" << Suffix << "(";
         } else {
             Out_ << "FAKE_VALUE_FUNC" << Suffix << "(";
-            Type.print(Out_, PrintingPolicy_);
+            writeType(Type);
             Out_ << ", ";
         }
 
@@ -179,7 +179,7 @@ extern "C" {
                  * so we have to remove potential consts here.
                  */
                 Type.removeLocalConst();
-                Type.print(Out_, PrintingPolicy_);
+                writeType(Type);
             }
         }
 

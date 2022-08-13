@@ -132,6 +132,18 @@ void Generator::write() const
     Out << Buffer_ << "\n";
 }
 
+void Generator::writeMacroDefinitions()
+{
+    Out_ << R"(
+#ifdef __cplusplus
+#define CCMOCK_DECL extern "C"
+#else
+#define CCMOCK_DECL
+#endif
+
+)";
+}
+
 void Generator::writeGlobalVariables()
 {
     for (auto &Decl : Variables_) {
@@ -146,7 +158,7 @@ void Generator::writeGlobalVariables()
          */
         auto Pointee = Type->getPointeeType();
         if (Pointee.isNull() || !Pointee->isFunctionType()) {
-            Type.print(Out_, PrintingPolicy_);
+            writeType(Type);
             Out_ << " " << *Decl << ";\n";
             continue;
         }
@@ -160,3 +172,76 @@ void Generator::writeGlobalVariables()
     if (!Variables_.empty())
         Out_ << "\n";
 }
+
+void Generator::writeFunctionParameterList(const clang::FunctionDecl *Decl)
+{
+    auto Parameters = Decl->parameters();
+
+    if (Parameters.empty()) {
+        if (PrintingPolicy_.UseVoidForZeroParams)
+            Out_ << "(void)";
+        else
+            Out_ << "()";
+
+        return;
+    }
+
+    Out_ << "(";
+
+    for (unsigned int i = 0, Size = Parameters.size(); i < Size; ++i) {
+        if (i != 0)
+            Out_ << ", ";
+
+        /* Ensure that every parameter will have a name associated to it */
+        if (!Parameters[i]->getName().empty()) {
+            Parameters[i]->print(Out_, PrintingPolicy_);
+            continue;
+        }
+
+        auto Type = Parameters[i]->getType();
+        auto Pointee = Type->getPointeeType();
+
+        if (Pointee.isNull() || !Pointee->isFunctionType()) {
+            Type.print(Out_, PrintingPolicy_);
+
+            /*
+             * We need to be aware of something like "char *const ptr;".
+             * Just checking for "isPointerType()" or "isReferenceType()" to
+             * determine whether we need to append a space character or not is
+             * not sufficient to correctly print such a type declaration.
+             */
+            if (auto C = Buffer_.back(); C != '&' && C != '*')
+                Out_ << " ";
+
+            Out_ << "arg" << i + 1;
+
+            continue;
+        }
+
+        /*
+         * Function pointers or references can be extremely tricky to print
+         * as the name of the corresponding variable is surrounded by its own
+         * type, e.g.:
+         *      void *(*func)(void (*)(int, int))
+         *             ^~~~
+         * We therefore create a new VarDecl (which is obviously not part of
+         * the parsed source code) with an appropriate name and then let
+         * clang's "Decl::print" function do the heavy lifting.
+         */
+        std::string Name;
+        llvm::raw_string_ostream OS(Name);
+
+        OS << "arg" << i + 1;
+
+        auto &Context = Decl->getASTContext();
+        auto VarDecl = util::decl::fakeVarDecl(Context, Type, Name);
+        VarDecl->print(Out_, PrintingPolicy_);
+    }
+
+    if (Decl->isVariadic())
+        Out_ << ", ...";
+
+    Out_ << ")";
+}
+
+

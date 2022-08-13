@@ -15,12 +15,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <llvm/Support/raw_ostream.h>
+#include "ASTVisitor.hpp"
 
 #include <clang/Basic/Builtins.h>
 #include <clang/Basic/SourceManager.h>
+#include <llvm/Support/raw_ostream.h>
 
-#include "ASTVisitor.hpp"
 #include "util/Glob.hpp"
 #include "util/commandline.hpp"
 

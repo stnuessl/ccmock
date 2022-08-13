@@ -34,7 +34,6 @@ private:
     void writeMockFunctions();
     void writeMain();
 
-    void writeFunctionParameterList(const clang::FunctionDecl *Decl);
     void writeMockParameterList(const clang::FunctionDecl *Decl);
     void writeMockCall(const clang::FunctionDecl *Decl);
     void writeFunctionBody(const clang::FunctionDecl *Decl);

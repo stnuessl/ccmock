@@ -31,6 +31,7 @@ GMock::GMock(std::shared_ptr<const Config> Config, clang::PrintingPolicy Policy)
 void GMock::run()
 {
     writeIncludeDirectives();
+    writeMacroDefinitions();
     writeMockClasses();
     writeMockInstances();
     writeMockFunctions();
@@ -50,7 +51,6 @@ void GMock::writeIncludeDirectives()
     Out_ << R"(
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
-
 )";
 }
 
@@ -60,7 +60,7 @@ void GMock::writeMockClasses()
          << " {\n"
             "public:\n";
 
-    for (const auto FunctionDecl : Functions_) {
+    for (const auto Decl : Functions_) {
         /*
          * TODO: Solution if multiple functions with same name in different
          * namespaces exists.
@@ -71,9 +71,9 @@ void GMock::writeMockClasses()
          *      MOCK_METHOD((ReturnType), FunctionName, ((Parameters));
          */
         Out_ << "    MOCK_METHOD((";
-        FunctionDecl->getReturnType().print(Out_, PrintingPolicy_);
-        Out_ << "), " << *FunctionDecl << ", ";
-        writeMockParameterList(FunctionDecl);
+        writeReturnType(Decl);
+        Out_ << "), " << *Decl << ", ";
+        writeMockParameterList(Decl);
         Out_ << ");\n";
     }
 
@@ -96,20 +96,16 @@ void GMock::writeMockInstances()
 
 void GMock::writeMockFunctions()
 {
-    for (const auto FunctionDecl : Functions_) {
-        if (FunctionDecl->isExternC())
-            Out_ << "extern \"C\" ";
+    for (const auto Decl : Functions_) {
+        if (Decl->isExternC())
+            Out_ << "CCMOCK_DECL ";
 
-        auto Type = FunctionDecl->getReturnType();
-        Type.print(Out_, PrintingPolicy_);
-
-        if (!Type->isPointerType() && !Type->isReferenceType())
-            Out_ << " ";
-
-        Out_ << *FunctionDecl;
-        writeFunctionParameterList(FunctionDecl);
+        writeReturnType(Decl);
         Out_ << "\n";
-        writeFunctionBody(FunctionDecl);
+        writeQualifiedName(Decl);
+        writeFunctionParameterList(Decl);
+        Out_ << "\n";
+        writeFunctionBody(Decl);
         Out_ << "\n";
     }
 }
@@ -130,76 +126,6 @@ int main(int argc, char *argv[])
 }
 )";
     /* clang-format on */
-}
-
-void GMock::writeFunctionParameterList(const clang::FunctionDecl *Decl)
-{
-    auto Parameters = Decl->parameters();
-
-    if (Parameters.empty()) {
-        if (PrintingPolicy_.UseVoidForZeroParams)
-            Out_ << "(void)";
-        else
-            Out_ << "()";
-
-        return;
-    }
-
-    Out_ << "(";
-
-    for (unsigned int i = 0, Size = Parameters.size(); i < Size; ++i) {
-        if (i != 0)
-            Out_ << ", ";
-
-        if (!Parameters[i]->getName().empty()) {
-            Parameters[i]->print(Out_, PrintingPolicy_);
-            continue;
-        }
-
-        auto Type = Parameters[i]->getType();
-        auto Pointee = Type->getPointeeType();
-
-        if (Pointee.isNull() || !Pointee->isFunctionType()) {
-            Type.print(Out_, PrintingPolicy_);
-
-            /*
-             * We need to be aware of something like "char *const ptr;".
-             * Just checking for "isPointerType()" or "isReferenceType()" to
-             * determine whether we need to append a space character or not is
-             * not sufficient to correctly print such a type declaration.
-             */
-            if (auto C = Buffer_.back(); C != '&' && C != '*')
-                Out_ << " ";
-
-            Out_ << "arg" << i + 1;
-
-            continue;
-        }
-
-        /*
-         * Function pointers or references can be extremely tricky to print
-         * as the name of the corresponding variable is surrounded by its own
-         * type, e.g.:
-         *      void *(*func)(void (*)(int, int))
-         *             ^~~~
-         * We therefore create a new VarDecl (which is obviously not part of
-         * the parsed source code) with an appropriate name and then let
-         * clang's "Decl::print" function do the heavy lifting.
-         */
-        std::string Name;
-        llvm::raw_string_ostream OS(Name);
-
-        OS << "arg" << i + 1;
-
-        auto &Context = Decl->getASTContext();
-        auto VarDecl = util::decl::fakeVarDecl(Context, Type, Name);
-        VarDecl->print(Out_, PrintingPolicy_);
-    }
-
-    if (Decl->isVariadic())
-        Out_ << ", ...";
-
-    Out_ << ")";
 }
 
 void GMock::writeMockParameterList(const clang::FunctionDecl *Decl)
@@ -303,7 +229,7 @@ void GMock::writeFunctionBody(const clang::FunctionDecl *Decl)
          << "    ";
 
     if (!Decl->getReturnType()->isVoidType())
-        Out_ << "auto value_ = ";
+        Out_ << "auto mock_val = ";
 
     writeMockCall(Decl);
 
@@ -311,7 +237,7 @@ void GMock::writeFunctionBody(const clang::FunctionDecl *Decl)
 
     if (!Decl->getReturnType()->isVoidType()) {
         Out_ << "\n"
-                "    return value_;\n";
+                "    return mock_val;\n";
     }
 
     Out_ << "}\n";

@@ -103,34 +103,6 @@ public:
     }
 };
 
-template <> struct MappingTraits<Config::GMockSection> {
-public:
-    static void mapping(llvm::yaml::IO &IO, Config::GMockSection &Section)
-    {
-        IO.mapOptional("MockType", Section.MockType);
-        IO.mapOptional("MockName", Section.MockName);
-        IO.mapOptional("MockSuffix", Section.MockSuffix);
-        IO.mapOptional("WriteMain", Section.WriteMain);
-    }
-
-    static std::string validate(llvm::yaml::IO &IO,
-                                Config::GMockSection &Section)
-    {
-        (void) IO;
-
-        if (Section.MockType == "NaggyMock")
-            return "";
-
-        if (Section.MockType == "NiceMock")
-            return "";
-
-        if (Section.MockType == "StrictMock")
-            return "";
-
-        return "\"MockType\": invalid value";
-    }
-};
-
 template <> struct MappingTraits<Config::GeneralSection> {
 public:
     static void mapping(llvm::yaml::IO &IO, Config::GeneralSection &Section)
@@ -169,6 +141,35 @@ public:
     }
 };
 
+template <> struct MappingTraits<Config::GMockSection> {
+public:
+    static void mapping(llvm::yaml::IO &IO, Config::GMockSection &Section)
+    {
+        IO.mapOptional("MockType", Section.MockType);
+        IO.mapOptional("MockName", Section.MockName);
+        IO.mapOptional("MockSuffix", Section.MockSuffix);
+        IO.mapOptional("WriteMain", Section.WriteMain);
+    }
+
+    static std::string validate(llvm::yaml::IO &IO,
+                                Config::GMockSection &Section)
+    {
+        (void) IO;
+
+        if (Section.MockType == "NaggyMock")
+            return "";
+
+        if (Section.MockType == "NiceMock")
+            return "";
+
+        if (Section.MockType == "StrictMock")
+            return "";
+
+        return "\"MockType\": invalid value";
+    }
+};
+
+
 template <> struct MappingTraits<Config::FFFSection> {
 public:
     static void mapping(llvm::yaml::IO &IO, Config::FFFSection &Section)
@@ -185,9 +186,9 @@ public:
     static void mapping(llvm::yaml::IO &IO, Config &Config)
     {
         IO.mapOptional("Clang", Config.Clang);
-        IO.mapOptional("GMock", Config.GMock);
         IO.mapOptional("General", Config.General);
         IO.mapOptional("Mocking", Config.Mocking);
+        IO.mapOptional("GMock", Config.GMock);
         IO.mapOptional("FFF", Config.FFF);
     }
 };
@@ -241,7 +242,7 @@ Config::FFFSection::FFFSection()
 {
 }
 
-Config::Config() : Clang(), GMock(), General(), Mocking(), FFF()
+Config::Config() : Clang(), General(), Mocking(), GMock(), FFF()
 {
 }
 

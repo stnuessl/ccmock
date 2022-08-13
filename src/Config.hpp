@@ -65,16 +65,6 @@ public:
         bool WriteDate;
     };
 
-    struct GMockSection {
-    public:
-        GMockSection();
-
-        std::string MockType;
-        std::string MockName;
-        std::string MockSuffix;
-        bool WriteMain;
-    };
-
     struct MockingSection {
     public:
         MockingSection();
@@ -87,6 +77,16 @@ public:
         bool MockCStdLib;
         bool MockCXXStdLib;
         bool MockVariadicFunctions;
+    };
+
+    struct GMockSection {
+    public:
+        GMockSection();
+
+        std::string MockType;
+        std::string MockName;
+        std::string MockSuffix;
+        bool WriteMain;
     };
 
     struct FFFSection {
@@ -106,9 +106,9 @@ public:
     void write(llvm::raw_ostream &OS);
 
     ClangSection Clang;
-    GMockSection GMock;
     GeneralSection General;
     MockingSection Mocking;
+    GMockSection GMock;
     FFFSection FFF;
 };
 

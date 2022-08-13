@@ -172,9 +172,9 @@ $(RESULT_DIR)/$(CCMOCK_BACKEND)/%.inc: $(srcdir)/%.c $(compile_commands)
 		--backend $(CCMOCK_BACKEND) \
 		$<
 
-$(src): | $(srcdir)
+$(src): $(srcdir)/CMakeLists.txt
 
-$(compile_commands): | $(srcdir)
+$(compile_commands): $(srcdir)/CMakeLists.txt
 	@printf "$(magenta)Configuring [ $@ ]$(reset)\n"
 	$(Q)cmake \
 		-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
@@ -182,14 +182,14 @@ $(compile_commands): | $(srcdir)
 		-B $(@D) \
 		> /dev/null || (rm -f $@ || false)
 
-$(srcdir):
-	@printf "$(magenta)Downloading [ $@ ]$(reset)\n"
+$(srcdir)/CMakeLists.txt:
+	@printf "$(magenta)Downloading [ zlib-ng ]$(reset)\n"
 ifeq ($(Q),@)
-	@git clone --quiet https://github.com/zlib-ng/zlib-ng $@
-	@cd $@ && git checkout tags/2.0.6 -b ccmock_test > /dev/null 2>&1
+	@git clone --quiet https://github.com/zlib-ng/zlib-ng $(srcdir)
+	@cd $(srcdir) && git checkout tags/2.0.6 -b ccmock_test > /dev/null 2>&1
 else
-	@git clone https://github.com/zlib-ng/zlib-ng $@
-	@cd $@ && git checkout tags/2.0.6 -b ccmock_test
+	@git clone https://github.com/zlib-ng/zlib-ng $(srcdir)
+	@cd $(srcdir) && git checkout tags/2.0.6 -b ccmock_test
 endif
 
 $(ut_out) $(ut_gen) $(objs) $(ut_objs) $(compile_commands): | $(dirs)

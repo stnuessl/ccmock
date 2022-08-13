@@ -560,7 +560,7 @@ syntax-check: $(debug_objs)
 $(release_bin): $(release_objs)
 	@printf "$(yellow)Linking [ $@ ]$(reset)\n"
 	$(Q)$(LD) -o $@ $^ $(LDFLAGS) $(LDLIBS)
-	$(Q)strip --strip-all $@
+	$(Q)strip --strip-all $@ || (rm -f $@ && false)
 	@printf "$(green)Built target [ $@ ]$(reset)\n"
 	@sha256sum --tag $@
 

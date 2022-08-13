@@ -35,7 +35,12 @@ public:
     virtual void run() = 0;
 
 protected:
+    void writeMacroDefinitions();
     void writeGlobalVariables();
+    inline void writeType(clang::QualType Type);
+    inline void writeReturnType(const clang::FunctionDecl *Decl);
+    inline void writeQualifiedName(const clang::FunctionDecl *Decl);
+    void writeFunctionParameterList(const clang::FunctionDecl *Decl);
 
     std::shared_ptr<const Config> Config_;
     clang::PrintingPolicy PrintingPolicy_;
@@ -52,5 +57,20 @@ private:
 
     llvm::StringRef Backend_;
 };
+
+inline void Generator::writeType(clang::QualType Type)
+{
+    Type.print(Out_, PrintingPolicy_);
+}
+
+inline void Generator::writeReturnType(const clang::FunctionDecl *Decl)
+{
+    writeType(Decl->getReturnType());
+}
+
+inline void Generator::writeQualifiedName(const clang::FunctionDecl *Decl)
+{
+    Decl->printQualifiedName(Out_, PrintingPolicy_);
+}
 
 #endif /* GENERATOR_HPP_ */
