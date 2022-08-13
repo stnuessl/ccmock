@@ -15,15 +15,35 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdlib.h>
+#include "../src/functable.h"
+#include "../src/zbuild.h"
+#include "../src/zlib-ng.h"
 
-#include "callback.h"
+/*
+ * Function declarations which are not availabie via header files.
+ * Be aware that these functions need C linkage .
+ */
+uint32_t adler32_c(uint32_t adler, const unsigned char *buf, size_t len);
 
-void callback_invoke1(void *(*) (void *, void *) );
-void callback_invoke2(int (*(*func)(long num))(int a, int b));
+#include "adler32.inc"
 
-void callback_main(void)
+static void test_adler32_c_001(void **arg)
 {
-    callback_invoke1(NULL);
-    callback_invoke2(NULL);
+    functable.adler32 = &adler32_c;
+
+    (void) arg;
+
+    assert_int_equal(1, adler32_c(0, NULL, 0));
+}
+
+int main(int argc, char *argv[])
+{
+    const struct CMUnitTest tests[] = {
+        cmocka_unit_test(test_adler32_c_001),
+    };
+
+    (void) argc;
+    (void) argv;
+
+    return cmocka_run_group_tests(tests, NULL, NULL);
 }

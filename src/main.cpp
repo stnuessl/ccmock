@@ -88,6 +88,11 @@ static llvm::cl::opt<Config::Backend> Backend(
             Config::BACKEND_FFF,
             "fff",
             "Use the Fake Function Framework backend."
+        ),
+        clEnumValN(
+            Config::BACKEND_CMOCKA,
+            "cmocka",
+            "Use the CMocka backend."
         )
     ),
     llvm::cl::value_desc("backend"),

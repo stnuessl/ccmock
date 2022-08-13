@@ -60,6 +60,7 @@ public:
     {
         io.enumCase(Value, "gmock", Config::BACKEND_GMOCK);
         io.enumCase(Value, "fff", Config::BACKEND_FFF);
+        io.enumCase(Value, "cmocka", Config::BACKEND_CMOCKA);
     }
 };
 
@@ -169,7 +170,6 @@ public:
     }
 };
 
-
 template <> struct MappingTraits<Config::FFFSection> {
 public:
     static void mapping(llvm::yaml::IO &IO, Config::FFFSection &Section)
@@ -178,6 +178,15 @@ public:
         IO.mapOptional("GCCFunctionAttributes", Section.GCCFunctionAttributes);
         IO.mapOptional("ArgHistoryLen", Section.ArgHistoryLen);
         IO.mapOptional("CallHistoryLen", Section.CallHistoryLen);
+    }
+};
+
+template <> struct MappingTraits<Config::CMockaSection> {
+public:
+    static void mapping(llvm::yaml::IO &IO, Config::CMockaSection &Section)
+    {
+        IO.mapOptional("OutputParameters", Section.OutputParameters);
+        IO.mapOptional("StrictMocks", Section.StrictMocks);
     }
 };
 
@@ -190,6 +199,7 @@ public:
         IO.mapOptional("Mocking", Config.Mocking);
         IO.mapOptional("GMock", Config.GMock);
         IO.mapOptional("FFF", Config.FFF);
+        IO.mapOptional("CMocka", Config.CMocka);
     }
 };
 
@@ -202,6 +212,11 @@ Config::ClangSection::ClangSection()
       RemoveArguments(),
       ResourceDirectory(),
       CompileCommandIndex(0)
+{
+}
+
+Config::CMockaSection::CMockaSection()
+    : OutputParameters(true), StrictMocks(true)
 {
 }
 
@@ -242,7 +257,7 @@ Config::FFFSection::FFFSection()
 {
 }
 
-Config::Config() : Clang(), General(), Mocking(), GMock(), FFF()
+Config::Config() : Clang(), General(), Mocking(), GMock(), FFF(), CMocka()
 {
 }
 

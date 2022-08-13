@@ -43,11 +43,19 @@ outdir := $(BUILD_DIR)/$(srcdir)
 ut_outdir := $(BUILD_DIR)/$(ut_srcdir)
 
 src		:= $(shell find $(srcdir) -name "*.c")
-ut_src	:= $(shell find $(ut_srcdir) -name "*.cpp")
 objs	:= $(patsubst %.c,$(BUILD_DIR)/%.o,$(src))
+
+ifeq ($(CCMOCK_BACKEND),cmocka)
+ut_src	:= $(shell find $(ut_srcdir) -name "*.c")
+ut_objs	:= $(patsubst %.c,$(BUILD_DIR)/%.o,$(ut_src))
+ut_gen	:= $(patsubst %.c,$(RESULT_DIR)/%.inc,$(ut_src))
+ut_out	:= $(patsubst %.c,$(RESULT_DIR)/%.xml,$(ut_src))
+else
+ut_src	:= $(shell find $(ut_srcdir) -name "*.cpp")
 ut_objs	:= $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(ut_src))
 ut_gen	:= $(patsubst %.cpp,$(RESULT_DIR)/%.inc,$(ut_src))
 ut_out	:= $(patsubst %.cpp,$(RESULT_DIR)/%.xml,$(ut_src))
+endif
 
 compile_commands := $(BUILD_DIR)/compile_commands.json
 
@@ -73,17 +81,18 @@ dirs := \
 	$(sort $(dir $(ut_out)))
 
 
-CPPFLAGS	:= $(shell pkgconf --cflags gtest)
 CFLAGS		:= -Wall -std=c99 -O2
 CXXFLAGS	:= -Wall -std=c++17 -O2
-LDFLAGS		:= -lstdc++
 
 ifeq ($(CCMOCK_BACKEND),gmock)
-CFLAGS		+= $(shell pkgconf --cflags gmock gtest)
-LDFLAGS		+= $(shell pkgconf --libs gmock gtest)
-else
-CFLAGS		+= $(shell pkgconf --cflags gtest)
-LDFLAGS		+= $(shell pkgconf --libs gtest)
+CPPFLAGS	:= $(shell pkgconf --cflags gmock gtest)
+LDFLAGS		:= -lstdc++ $(shell pkgconf --libs gmock gtest)
+else ifeq ($(CCMOCK_BACKEND),fff)
+CPPFLAGS	:= $(shell pkgconf --cflags gtest)
+LDFLAGS		:= -lstdc++ $(shell pkgconf --libs gtest)
+else ifeq ($(CCMOCK_BACKEND),cmocka)
+CPPFLAGS	:= $(shell pkgconf --cflags cmocka)
+LDFLAGS		:= -lstdc++ $(shell pkgconf --libs cmocka)
 endif
 #
 # Setting terminal colors
@@ -118,19 +127,29 @@ all: $(ut_out)
 
 $(RESULT_DIR)/%.xml: $(BUILD_DIR)/%.out
 	@printf "$(green)Executing [ $< ]$(reset)\n"
+ifeq ($(CCMOCK_BACKEND),cmocka)
 ifeq ($(Q),@)
-	$(Q)./$< --gtest_output=xml:$@ > /dev/null 2>&1
+	$(Q)CMOCKA_MESSAGE_OUTPUT=xml CMOCKA_XML_FILE=$@ $< 
 else
-	$(Q)./$< --gtest_output=xml:$@
+	$(Q)CMOCKA_MESSAGE_OUTPUT=xml $< | tee $@ || (rm -f $@ && false)
+endif
+else ifeq ($(Q),@)
+	$(Q)$< --gtest_output=xml:$@ > /dev/null 2>&1
+else
+	$(Q)$< --gtest_output=xml:$@
 endif
 
 $(ut_outdir)/%.out: $(ut_outdir)/%.o $(outdir)/%.o
 	@printf "$(yellow)Linking [ $@ ]$(reset)\n"
-	$(Q)$(LD) -o $@ $^ $(CXXFLAGS) $(LDFLAGS) $(LDLIBS)
+	$(Q)$(LD) -o $@ $^ $(LDFLAGS) $(LDLIBS)
 
 $(outdir)/%.o: $(srcdir)/%.c
 	@printf "$(blue)Building [ $@ ]$(reset)\n"
 	$(Q)$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $<
+
+$(ut_outdir)/%.o: $(ut_srcdir)/%.c $(RESULT_DIR)/$(CCMOCK_BACKEND)/%.inc
+	@printf "$(blue)Building [ $@ ]$(reset)\n"
+	$(Q)$(CXX) -c -o $@ $(ut_inc) $(CPPFLAGS) $(CFLAGS) $<
 
 $(ut_outdir)/%.o: $(ut_srcdir)/%.cpp $(RESULT_DIR)/$(CCMOCK_BACKEND)/%.inc
 	@printf "$(blue)Building [ $@ ]$(reset)\n"

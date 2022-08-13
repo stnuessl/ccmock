@@ -20,6 +20,7 @@
 #include <clang/Frontend/CompilerInstance.h>
 #include <filesystem>
 
+#include "CMocka.hpp"
 #include "FFF.hpp"
 #include "GMock.hpp"
 #include "util/commandline.hpp"
@@ -65,6 +66,8 @@ MockAction::CreateASTConsumer(clang::CompilerInstance &CI, llvm::StringRef File)
         return std::make_unique<GMock>(Config_, Policy);
     case Config::BACKEND_FFF:
         return std::make_unique<FFF>(Config_, Policy);
+    case Config::BACKEND_CMOCKA:
+        return std::make_unique<CMocka>(Config_, Policy);
     default:
         llvm_unreachable("invalid mocking backend");
         break;

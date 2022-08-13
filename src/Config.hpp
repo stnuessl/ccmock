@@ -36,6 +36,7 @@ public:
     enum Backend {
         BACKEND_GMOCK,
         BACKEND_FFF,
+        BACKEND_CMOCKA,
     };
 
     struct ClangSection {
@@ -99,6 +100,14 @@ public:
         int CallHistoryLen;
     };
 
+    struct CMockaSection {
+    public:
+        CMockaSection();
+
+        bool OutputParameters;
+        bool StrictMocks;
+    };
+
     Config();
 
     void read(llvm::StringRef Path);
@@ -110,6 +119,7 @@ public:
     MockingSection Mocking;
     GMockSection GMock;
     FFFSection FFF;
+    CMockaSection CMocka;
 };
 
 #endif /* CONFIG_HPP_ */

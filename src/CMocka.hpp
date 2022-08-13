@@ -15,15 +15,22 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdlib.h>
+#ifndef CMOCKA_HPP_
+#define CMOCKA_HPP_
 
-#include "callback.h"
+#include "Generator.hpp"
 
-void callback_invoke1(void *(*) (void *, void *) );
-void callback_invoke2(int (*(*func)(long num))(int a, int b));
+class CMocka : public Generator {
+public:
+    CMocka(std::shared_ptr<const Config> Config, clang::PrintingPolicy Policy);
 
-void callback_main(void)
-{
-    callback_invoke1(NULL);
-    callback_invoke2(NULL);
-}
+    virtual void run() override;
+
+private:
+    void writeIncludeDirectives();
+    void writeMockFunctions();
+
+    void writeFunctionBody(const clang::FunctionDecl *Decl);
+};
+
+#endif /* CMOCKA_HPP_ */

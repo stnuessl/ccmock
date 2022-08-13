@@ -51,6 +51,7 @@ protected:
     std::vector<const clang::DeclaratorDecl *> Variables_;
 
     bool AnyVariadic_;
+
 private:
     void writeFileHeader();
     void write() const;

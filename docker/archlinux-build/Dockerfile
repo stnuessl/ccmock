@@ -9,6 +9,7 @@ FROM archlinux:base
 RUN pacman -Syu --noconfirm \
     clang \
     cmake \
+    cmocka \
     cppcheck \
     ctags \
     findutils \

@@ -21,6 +21,7 @@ RUN apt-get update && apt-get --assume-yes install \
     git \
     lcov \
     libclang-dev \
+    libcmocka-dev \
     libgmock-dev \
     libgtest-dev \
     llvm-dev \

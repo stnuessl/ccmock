@@ -40,13 +40,25 @@ ut_srcdir := $(CCMOCK_BACKEND)
 outdir := $(BUILD_DIR)/$(srcdir)
 ut_outdir := $(BUILD_DIR)/$(ut_srcdir)
 
-ut_src	:= $(shell find $(ut_srcdir) -name "*.cpp")
+ifeq ($(CCMOCK_BACKEND),cmocka)
+ut_src	:= $(shell find $(ut_srcdir) -name "*.c")
+ut_objs	:= $(patsubst %.c,$(BUILD_DIR)/%.o,$(ut_src))
+ut_gen	:= $(patsubst %.c,$(RESULT_DIR)/%.inc,$(ut_src))
+ut_out	:= $(patsubst %.c,$(RESULT_DIR)/%.xml,$(ut_src))
+
 # Needed to automate cloning of the repository
-src		:= $(patsubst $(ut_srcdir)/%.cpp,$(srcdir)/%.c,$(ut_src))
-objs	:= $(patsubst %.c,$(BUILD_DIR)/%.o,$(src))
+src		:= $(patsubst $(ut_srcdir)/%.c,$(srcdir)/%.c,$(ut_src))
+else
+ut_src	:= $(shell find $(ut_srcdir) -name "*.cpp")
 ut_objs	:= $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(ut_src))
 ut_gen	:= $(patsubst %.cpp,$(RESULT_DIR)/%.inc,$(ut_src))
 ut_out	:= $(patsubst %.cpp,$(RESULT_DIR)/%.xml,$(ut_src))
+
+# Needed to automate cloning of the repository
+src		:= $(patsubst $(ut_srcdir)/%.cpp,$(srcdir)/%.c,$(ut_src))
+endif
+
+objs	:= $(patsubst %.c,$(BUILD_DIR)/%.o,$(src))
 
 compile_commands := $(BUILD_DIR)/build/compile_commands.json
 
@@ -100,22 +112,22 @@ CPPFLAGS	:= \
 	-DZLIB_DLL \
 	-D_LARGEFILE64_SOURCE=1 \
 	-D__USE_LARGEFILE64 \
-	$(shell pkgconf --cflags gtest) \
 	-I$(BUILD_DIR)/build \
 	-I$(srcdir)/
 
-CFLAGS		:= -Wall -std=c99 -O2
+CFLAGS		:= -Wall -std=c99 -g3
 CXXFLAGS	:= -Wall -std=c++17 -O2
-LDFLAGS		:= -lstdc++
 
 ifeq ($(CCMOCK_BACKEND),gmock)
-CFLAGS		+= $(shell pkgconf --cflags gmock gtest)
-LDFLAGS		+= $(shell pkgconf --libs gmock gtest)
-else
-CFLAGS		+= $(shell pkgconf --cflags gtest)
-LDFLAGS		+= $(shell pkgconf --libs gtest)
+CPPFLAGS	+= $(shell pkgconf --cflags gmock gtest)
+LDFLAGS		:= -lstdc++ $(shell pkgconf --libs gmock gtest)
+else ifeq ($(CCMOCK_BACKEND),fff)
+CPPFLAGS	+= $(shell pkgconf --cflags gtest)
+LDFLAGS		:= -lstdc++ $(shell pkgconf --libs gtest)
+else ifeq ($(CCMOCK_BACKEND),cmocka)
+CPPFLAGS	+= $(shell pkgconf --cflags cmocka)
+LDFLAGS		:= -lstdc++ $(shell pkgconf --libs cmocka)
 endif
-
 
 #
 # Setting terminal colors
@@ -144,10 +156,16 @@ all: $(ut_out)
 
 $(RESULT_DIR)/%.xml: $(BUILD_DIR)/%.out
 	@printf "$(green)Executing [ $< ]$(reset)\n"
+ifeq ($(CCMOCK_BACKEND),cmocka)
 ifeq ($(Q),@)
-	$(Q)./$< --gtest_output=xml:$@ > /dev/null 2>&1
+	$(Q)CMOCKA_MESSAGE_OUTPUT=xml CMOCKA_XML_FILE=$@ $< 
 else
-	$(Q)./$< --gtest_output=xml:$@
+	$(Q)CMOCKA_MESSAGE_OUTPUT=xml $< | tee $@ || (rm -f $@ && false)
+endif
+else ifeq ($(Q),@)
+	$(Q)$< --gtest_output=xml:$@ > /dev/null 2>&1
+else
+	$(Q)$< --gtest_output=xml:$@
 endif
 
 $(ut_outdir)/%.out: $(ut_outdir)/%.o $(outdir)/%.o
@@ -159,6 +177,10 @@ $(ut_outdir)/%.out: $(ut_outdir)/%.o $(outdir)/%.o
 $(outdir)/%.o: $(srcdir)/%.c $(compile_commands)
 	@printf "$(blue)Building [ $@ ]$(reset)\n"
 	$(Q)$(CC) -c -o $@ $(CPPFLAGS) $(CFLAGS) $<
+
+$(ut_outdir)/%.o: $(ut_srcdir)/%.c $(RESULT_DIR)/$(CCMOCK_BACKEND)/%.inc
+	@printf "$(blue)Building [ $@ ]$(reset)\n"
+	$(Q)$(CXX) -c -o $@ $(ut_inc) $(CPPFLAGS) $(CFLAGS) $<
 
 $(ut_outdir)/%.o: $(ut_srcdir)/%.cpp $(RESULT_DIR)/$(CCMOCK_BACKEND)/%.inc
 	@printf "$(blue)Building [ $@ ]$(reset)\n"

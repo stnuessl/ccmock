@@ -17,8 +17,8 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -35,7 +35,7 @@ int app_main(int argc, char *argv[])
 
     (void) argc;
     (void) argv;
-    
+
     buf = malloc(bufsize);
     if (unlikely(!buf)) {
         fprintf(stderr, "error: failed to allocate memory\n");

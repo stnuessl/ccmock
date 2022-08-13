@@ -15,15 +15,30 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdlib.h>
-
 #include "callback.h"
+#include "callback.inc"
 
-void callback_invoke1(void *(*) (void *, void *) );
-void callback_invoke2(int (*(*func)(long num))(int a, int b));
-
-void callback_main(void)
+static void test_invoke_main_basic(void **state)
 {
-    callback_invoke1(NULL);
-    callback_invoke2(NULL);
+    (void) state;
+
+    expect_function_call(callback_invoke1);
+    expect_value(callback_invoke1, arg1, NULL);
+
+    expect_function_call(callback_invoke2);
+    expect_value(callback_invoke2, func, NULL);
+
+    callback_main();
+}
+
+int main(int argc, char *argv[])
+{
+    const struct CMUnitTest tests[] = {
+        cmocka_unit_test(test_invoke_main_basic),
+    };
+
+    (void) argc;
+    (void) argv;
+
+    return cmocka_run_group_tests(tests, NULL, NULL);
 }

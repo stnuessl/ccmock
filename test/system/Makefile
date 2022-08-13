@@ -27,10 +27,12 @@ all: basic zlib-ng scripts
 basic: basic/Makefile
 	$(MAKE) --directory $@ CCMOCK_BACKEND=gmock
 	$(MAKE) --directory $@ CCMOCK_BACKEND=fff
+	$(MAKE) --directory $@ CCMOCK_BACKEND=cmocka
 
 zlib-ng: zlib-ng/Makefile
 	$(MAKE) --directory $@ CCMOCK_BACKEND=gmock
 	$(MAKE) --directory $@ CCMOCK_BACKEND=fff
+	$(MAKE) --directory $@ CCMOCK_BACKEND=cmocka
 
 scripts: scripts/Makefile
 	$(MAKE) --directory $@

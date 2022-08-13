@@ -15,15 +15,26 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdlib.h>
+#include <unistd.h>
 
-#include "callback.h"
+#include "app.inc"
 
-void callback_invoke1(void *(*) (void *, void *) );
-void callback_invoke2(int (*(*func)(long num))(int a, int b));
+void app_print(const char *fmt, ...);
+int app_main(int argc, char *argv[]);
 
-void callback_main(void)
+static void test_main_basic(void **state)
 {
-    callback_invoke1(NULL);
-    callback_invoke2(NULL);
+    (void) state;
+}
+
+int main(int argc, char *argv[])
+{
+    const struct CMUnitTest tests[] = {
+        cmocka_unit_test(test_main_basic),
+    };
+
+    (void) argc;
+    (void) argv;
+
+    return cmocka_run_group_tests(tests, NULL, NULL);
 }
