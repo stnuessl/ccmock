@@ -22,7 +22,7 @@ jobs:
       matrix:
         compiler: [clang, gcc]
         #docker_image: [archlinux-build, ubuntu-build]
-        docker_image: [archlinux-build]
+        docker_image: [archlinux-build, fedora-build]
     env:
       ARTIFACTORY_API_KEY: ${{ secrets.ARTIFACTORY_API_KEY }}
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}

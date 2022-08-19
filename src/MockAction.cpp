@@ -31,6 +31,7 @@ std::string DetectClangResourceDirectory()
 {
     std::filesystem::path PathList[] = {
         "/usr/lib/clang",
+        "/usr/lib64/clang",
         "/lib/clang",
     };
 
