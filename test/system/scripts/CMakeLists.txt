@@ -22,32 +22,26 @@
 # THE SOFTWARE.
 #
 
-CCMOCK	:= ../../../build/release/ccmock
-BUILD_DIR := ../../../build/system-tests/scripts
-RESULT_DIR := ../../../build/system-tests/results/scripts
+set(TARGET_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/config.tag)
+set(TARGET_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/config.sh)
+set(
+    TARGET_DEPS
+    ${CMAKE_CURRENT_SOURCE_DIR}/gmock.yaml
+    ${CMAKE_CURRENT_SOURCE_DIR}/mocking.yaml
+    ${CMAKE_CURRENT_SOURCE_DIR}/clang.yaml
+)
 
+add_custom_command(
+    OUTPUT ${TARGET_OUTPUT}
+    COMMAND bash config.sh ${CCMOCK_BIN} && touch ${TARGET_OUTPUT}
+    DEPENDS config.sh
+            ccmock
+            gmock.yaml
+            mocking.yaml
+            clang.yaml
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    VERBATIM
+)
 
-#
-# Setting terminal colors
-#
-ifneq ($(MAKEFILE_COLOR), 0)
-
-red			:= \e[1;31m
-green		:= \e[1;32m
-yellow		:= \e[1;33m
-blue		:= \e[1;34m
-magenta		:= \e[1;35m
-cyan		:= \e[1;36m
-reset		:= \e[0m
-
-endif
-
-all: config
-
-config: $(CCMOCK) config.sh gmock.yaml clang.yaml
-	@printf "$(magenta)Running [ $@ ]$(reset)\n"
-	bash config.sh $(CCMOCK)
-
-
-.PHONY: \
-	config
+add_custom_target(system-tests-scripts-config DEPENDS ${TARGET_OUTPUT})
+add_dependencies(system-tests system-tests-scripts-config)

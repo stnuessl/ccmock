@@ -29,12 +29,14 @@ SHELL := bash -o pipefail
 makefile := $(lastword $(MAKEFILE_LIST))
 makedir := $(patsubst %/,%,$(dir $(makefile)))
 
+PROJECT_NAME = ccmock
+
 DOCKER_DIR := build/docker
-TAG_PREFIX := crudebox
+TAG_PREFIX := $(PROJECT_NAME)
 
 targets := \
 	archlinux-build \
-#	fedora-build \
+	fedora-build \
 #	ubuntu-build
 
 #SCAN_DIR			:= $(DOCKER_DIR)/scan
@@ -64,9 +66,15 @@ all: $(patsubst %,$(DOCKER_DIR)/%.ack,$(targets))
 		--tty=$(if $(CMD),false,true) \
 		--rm \
 		--env ARTIFACTORY_API_KEY \
-		--volume ${PWD}:/crudebox \
+		--env CI \
+		--env GITHUB_JOB \
+		--env GITHUB_REF_NAME \
+		--env GITHUB_RUN_ID \
+		--env GITHUB_SHA \
+		--env SOURCE_DATE_EPOCH \
+		--volume ${PWD}:/project/$(PROJECT_NAME) \
 		--user $$(id -u):$$(id -g) \
-		--workdir /crudebox \
+		--workdir /project/$(PROJECT_NAME) \
 		$(TAG_PREFIX):$* $(CMD)
 
 $(DOCKER_DIR)/%.ack: $(makedir)/%/Dockerfile | $(dirs)

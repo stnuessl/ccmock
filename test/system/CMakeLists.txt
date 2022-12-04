@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 #
 # The MIT License (MIT)
 #
@@ -23,8 +22,16 @@
 # THE SOFTWARE.
 #
 
-set -e
+find_program(GIT git ${CCMOCK_REQUIRE_DEPS})
 
-bash ./configure.sh
+add_custom_target(system-tests)
+add_dependencies(tarball system-tests)
 
-make "$@" artifactory-upload
+set(FFF_INCLUDE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/common/include)
+
+add_subdirectory(basic)
+add_subdirectory(scripts)
+
+if(GIT)
+    add_subdirectory(zlib-ng)
+endif()

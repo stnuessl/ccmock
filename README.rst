@@ -2,9 +2,18 @@
 ccmock (Work in Progress)
 =========================
 
-.. image:: https://github.com/stnuessl/ccmock/actions/workflows/main.yaml/badge.svg
+.. image:: https://github.com/stnuessl/ccmock/actions/workflows/build.yaml/badge.svg
+   :alt: Build
+   :target: https://github.com/stnuessl/ccmock/actions
+
+.. image:: https://github.com/stnuessl/ccmock/actions/workflows/ci.yaml/badge.svg
    :alt: CI
    :target: https://github.com/stnuessl/ccmock/actions
+
+.. image:: https://img.shields.io/badge/License-GPLv3-blue.svg
+   :alt: License: GPL v3
+   :target: https://www.gnu.org/licenses/gpl-3.0
+
 
 Automatic mock creation for unit tests in C and C++.
 
@@ -51,13 +60,20 @@ Supported Platforms
 Required Programs
 -----------------
 
+Depending on which compiler you prefer, chose either
+* `gcc <https://gcc.gnu.org/>`_ 12.1.0 or
+* `clang <https://clang.llvm.org/>`_ 14.0.0.
+
+Also depending on what you prefer, chose either
+* `make <https://www.gnu.org/software/make/>`_ or
+* `ninja <https://ninja-build.org/>`_ 1.10.
+
+In any case, you'll also need to following programs to build **ccmock** from
+source:
+
 * `bash <https://www.gnu.org/software/bash/bash.html>`_
-* `gcc <https://gcc.gnu.org/>`_ 12.1.0
-* `clang <https://clang.llvm.org/>`_ 14.0.0
+* `cmake <https://cmake.org/>`_ 3.24
 * `git <https://git-scm.com/>`_
-* `make <https://www.gnu.org/software/make/>`_
-* `util-linux <https://github.com/util-linux/util-linux>`_
-* `find-utils <https://www.gnu.org/software/findutils/>`_
 
 Dependencies
 ------------
@@ -69,43 +85,36 @@ Dependencies
 Procedure
 ---------
 
-Install all required tools and libraries:
+Install all required tools and libraries (chosing the most conservative
+options):
 
 .. code:: sh
 
-   pacman -Syu llvm clang util-linux find-utils bash gcc clang git make \
-   util-linux find-utils
+   pacman -Syu llvm clang bash gcc git cmake make
 
 .. code:: sh
 
-   apt-get install llvm llvm-dev clang libclang-dev util-linux find utils bash \
-   gcc g++ clang git make util-linux 
+   apt-get install llvm llvm-dev clang libclang-dev bash gcc g++ git cmake make 
 
 
 Configure the build system:
 
 .. code:: sh
 
-   bash ./configure.sh
+   cmake -B build -DCMAKE_BUILD_TYPE=release
 
 
 Build the project with clang:
 
 .. code:: sh
 
-   make 
-
-If you want to build the project with gcc, run:
-
-.. code:: sh
-
-   make CXX=gcc LD=gcc
+   cmake --build build 
 
 Install the built program to */usr/local/bin*:
 
 .. code:: sh
 
-  make install
+   cmake --install build --strip
 
 
 Usage

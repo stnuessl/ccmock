@@ -9,10 +9,19 @@ FROM archlinux:base
 RUN pacman -Syu --noconfirm \
     clang \
     cmake \
+    cmocka \
+    cppcheck \
+    findutils \
     gcc \
+    git \
+    gtest \
+    lcov \
     llvm \
     make \
     ninja \
+    pkgconf \
+    tar \
+    shellcheck \
 && pacman -Scc --noconfirm \
 && useradd \
     --shell /usr/bin/bash \

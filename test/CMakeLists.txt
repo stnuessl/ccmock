@@ -22,30 +22,24 @@
 # THE SOFTWARE.
 #
 
-all: basic zlib-ng scripts
+find_library(LIB_GTEST NAMES gtest ${CCMOCK_REQUIRE_DEPS})
+find_library(LIB_GMOCK NAMES gmock ${CCMOCK_REQUIRE_DEPS})
+find_library(LIB_CMOCKA NAMES cmocka ${CCMOCK_REQUIRE_DEPS})
 
-basic: basic/Makefile
-	$(MAKE) --directory $@ CCMOCK_BACKEND=gmock
-	$(MAKE) --directory $@ CCMOCK_BACKEND=fff
-	$(MAKE) --directory $@ CCMOCK_BACKEND=cmocka
+find_program(PKGCONF pkgconf ${CCMOCK_REQUIRE_DEPS})
 
-zlib-ng: zlib-ng/Makefile
-	$(MAKE) --directory $@ CCMOCK_BACKEND=gmock
-	$(MAKE) --directory $@ CCMOCK_BACKEND=fff
-	$(MAKE) --directory $@ CCMOCK_BACKEND=cmocka
+add_subdirectory(static)
 
-scripts: scripts/Makefile
-	$(MAKE) --directory $@
+if (LIB_GTEST AND LIB_GMOCK AND LIB_CMOCKA AND PKGCONF)
 
-clean:
-	$(MAKE) --directory basic clean
-	$(MAKE) --directory zlib-ng clean
-	$(MAKE) --directory scripts clean
+    execute_process(
+        COMMAND pkgconf --cflags gtest
+        OUTPUT_VARIABLE GTEST_CFLAGS
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        COMMAND_ERROR_IS_FATAL ANY
+    )
 
+    add_subdirectory(system)
+    add_subdirectory(unit)
 
-.PHONY: \
-	all \
-	clean \
-	basic \
-	zlib-ng \
-	scripts
+endif()

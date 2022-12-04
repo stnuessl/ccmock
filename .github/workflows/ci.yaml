@@ -1,0 +1,57 @@
+#
+# Github workflow 
+#
+
+name: CI 
+on: 
+  pull_request:
+    branches:
+      - master
+      - dev
+  push:
+    branches:
+      - master
+      - dev
+  workflow_dispatch:
+  schedule:
+    - cron: "0 2 * * 6"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: [clang++, g++]
+        build_generator: ['Unix Makefiles', Ninja]
+        build_type: [debug, release]
+        docker_image: [archlinux-ci]
+    env:
+      ARTIFACTORY_API_KEY: ${{ secrets.ARTIFACTORY_API_KEY }}
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+    if: true 
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Create docker image
+        run: |
+          make -f docker/Makefile ${{ matrix.docker_image }} CMD=true
+      - name: Configure build system
+        run: |
+          make -f docker/Makefile ${{ matrix.docker_image }} CMD=" \
+              cmake \
+              -B build \
+              -G '${{ matrix.build_generator }}' \
+              -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+              -DCMAKE_CXX_COMPILER=${{ matrix.compiler }} \
+              -DEXTRA_CXXFLAGS=-Werror \
+              -DCCMOCK_REQUIRE_DEPS=true"
+      - name: Perform continuous integration build
+        run: |
+          make -f docker/Makefile ${{ matrix.docker_image }} CMD=" \
+              cmake \
+              --build build \
+              --parallel $(nproc) \
+              --target artifactory-upload"
+
+
+
