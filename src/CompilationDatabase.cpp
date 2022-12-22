@@ -16,6 +16,7 @@
  */
 
 #include <clang/Tooling/JSONCompilationDatabase.h>
+#include <clang/Tooling/CompilationDatabase.h>
 
 #include "CompilationDatabase.hpp"
 
@@ -46,8 +47,19 @@ void CompilationDatabase::detect(const std::filesystem::path &Path,
                                  std::string &Error)
 {
     using clang::tooling::CompilationDatabase;
+    using clang::tooling::FixedCompilationDatabase;
 
     Database_ = CompilationDatabase::autoDetectFromSource(Path.native(), Error);
+    if (Database_)
+        return;
+
+    /* 
+     * Fallback: Assume trivial compile commands. This also allows to specifiy
+     * additional compiler arguments via "--extra-arg" on the command-line.
+     */
+    auto Directory = llvm::sys::path::parent_path(Path.native());
+
+    Database_ = FixedCompilationDatabase::loadFromBuffer(Directory, "", Error);
 }
 
 std::vector<clang::tooling::CompileCommand>
