@@ -1,0 +1,29 @@
+---
+
+CompileFlags:
+    CompilationDatabase: ./build
+    Compiler: clang++
+
+Diagnostics:
+    UnusedIncludes: Strict
+    
+    ClangTidy:
+        Add: [
+            bugprone-*,
+            cert-*,
+            clang-analyzer-apiModeling.*,
+            clang-analyzer-core.*,
+            clang-analyzer-cplusplus.*,
+            clang-analyzer-security.*,
+            clang-analyzer-unix.*,
+            clang-analyzer-valist.*,
+            cppcoreguidelines-*,
+            llvm-*,
+            performance-*,
+        ]
+
+InlayHints:
+    Enabled: No
+    ParameterNames: No
+    DeducedTypes: No
+
