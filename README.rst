@@ -10,9 +10,9 @@ ccmock (Work in Progress)
    :alt: CI
    :target: https://github.com/stnuessl/ccmock/actions
 
-.. image:: https://img.shields.io/badge/License-GPLv3-blue.svg
-   :alt: License: GPL v3
-   :target: https://www.gnu.org/licenses/gpl-3.0
+.. image:: https://img.shields.io/badge/License-GPL_v2-blue.svg
+   :alt: License: GPL v2
+   :target: https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html
 
 
 Automatic mock creation for unit tests in C and C++.
