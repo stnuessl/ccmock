@@ -27,10 +27,10 @@ extern "C" {
 
 #include "callback.inc"
 
-TEST(invoke_main, basic)
+TEST_F(CCMockFixture, CallbackMain01)
 {
-    EXPECT_CALL(mock, callback_invoke1(nullptr));
-    EXPECT_CALL(mock, callback_invoke2(nullptr));
+    EXPECT_CALL(_, callback_invoke1(nullptr));
+    EXPECT_CALL(_, callback_invoke2(nullptr));
 
     callback_main();
 }

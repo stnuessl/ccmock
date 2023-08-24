@@ -147,8 +147,9 @@ public:
     static void mapping(llvm::yaml::IO &IO, Config::GMockSection &Section)
     {
         IO.mapOptional("MockType", Section.MockType);
-        IO.mapOptional("MockName", Section.MockName);
-        IO.mapOptional("MockSuffix", Section.MockSuffix);
+        IO.mapOptional("ClassName", Section.ClassName);
+        IO.mapOptional("GlobalNamespaceName", Section.GlobalNamespaceName);
+        IO.mapOptional("TestFixtureName", Section.TestFixtureName);
         IO.mapOptional("WriteMain", Section.WriteMain);
     }
 
@@ -157,16 +158,18 @@ public:
     {
         (void) IO;
 
-        if (Section.MockType == "NaggyMock")
-            return "";
+        if (Section.TestFixtureName.find('_') != std::string::npos)
+            return "\"TestFixtureName\": contains invalid \"_\" character";
 
-        if (Section.MockType == "NiceMock")
-            return "";
+        auto ValidMockTypes = { "NaggyMock", "NiceMock", "StrictMock" };
+        auto Pred = [&Section](llvm::StringRef Value) {
+            return Value == Section.MockType;
+        };
 
-        if (Section.MockType == "StrictMock")
-            return "";
+        if (llvm::none_of(ValidMockTypes, Pred))
+            return "\"MockType\": invalid value";
 
-        return "\"MockType\": invalid value";
+        return "";
     }
 };
 
@@ -222,8 +225,9 @@ Config::CMockaSection::CMockaSection()
 
 Config::GMockSection::GMockSection()
     : MockType("StrictMock"),
-      MockName("mock"),
-      MockSuffix("_mock"),
+      ClassName("ccmock_"),
+      GlobalNamespaceName("_"),
+      TestFixtureName("CCMockFixture"),
       WriteMain(true)
 {
 }

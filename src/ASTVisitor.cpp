@@ -37,6 +37,7 @@ static const llvm::StringMap<int> InternalBlacklist = {
     {"std::wcerr", 0},
 };
 
+
 ASTVisitor::ASTVisitor(std::shared_ptr<const Config> Config,
                        clang::ASTContext &Context)
     : Config_(std::move(Config)),
@@ -48,7 +49,7 @@ ASTVisitor::ASTVisitor(std::shared_ptr<const Config> Config,
       SourceManager_(&Context.getSourceManager())
 {
     Buffer_.reserve(256);
-    Result_.Decls.reserve(64);
+    Result_.VarDeclVec.reserve(64);
 
     for (const auto &Name : Config_->Mocking.Blacklist) {
         if (!util::glob::isPattern(Name)) {
@@ -126,13 +127,7 @@ void ASTVisitor::dispatch(const clang::Expr *Expr,
     if (!SourceManager_->isInMainFile(Expr->getExprLoc()))
         return;
 
-    if (Decl->isStatic())
-        return;
-
-    if (Decl->isInlined())
-        return;
-
-    if (Decl->hasBody())
+    if (Decl->isDefined())
         return;
 
     /*
@@ -208,6 +203,9 @@ void ASTVisitor::dispatch(const clang::Expr *Expr,
         }
     }
 
+    if (isVisited(Decl))
+        return;
+
     if (Decl->isVariadic()) {
         if (!Config_->Mocking.MockVariadicFunctions)
             return;
@@ -224,31 +222,27 @@ void ASTVisitor::dispatch(const clang::Expr *Expr,
         Result_.AnyVariadic = true;
     }
 
-    add(Decl);
+    Result_.FuncDeclMap[Decl->getDeclContext()].push_back(Decl);
 }
 
-void ASTVisitor::add(const clang::DeclaratorDecl *Decl)
+bool ASTVisitor::isVisited(const clang::DeclaratorDecl *Decl)
 {
-    auto ID = Decl->getID();
-
-    if (Visited_.count(ID))
-        return;
-
-    auto [_, ok] = Visited_.insert(ID);
-    if (!ok) {
+    auto [It, Ok] = Visited_.insert(Decl->getID());
+    if (!Ok && It == Visited_.end()) {
         llvm::errs() << util::cl::error() << ": ";
         Decl->printQualifiedName(llvm::errs());
-        llvm::errs() << ": failed to save function for further processing\n";
+        llvm::errs() << ": failed to store function declaration for further "
+                        "processing\n";
 
         std::exit(EXIT_FAILURE);
     }
 
-    Result_.Decls.push_back(Decl);
+    return !Ok;
 }
 
 void ASTVisitor::doVisitCallExpr(const clang::CallExpr *CallExpr)
 {
-    auto Decl = CallExpr->getDirectCallee();
+    const auto *Decl = CallExpr->getDirectCallee();
 
     dispatch(CallExpr, Decl);
 }
@@ -256,16 +250,17 @@ void ASTVisitor::doVisitCallExpr(const clang::CallExpr *CallExpr)
 void ASTVisitor::doVisitCXXConstructExpr(
     const clang::CXXConstructExpr *ConstructExpr)
 {
-    auto Decl = ConstructExpr->getConstructor();
+    const auto *Decl = ConstructExpr->getConstructor();
 
     dispatch(ConstructExpr, Decl);
+    dispatch(ConstructExpr, Decl->getParent()->getDestructor());
 }
 
 void ASTVisitor::doVisitDeclRefExpr(const clang::DeclRefExpr *DeclRefExpr)
 {
     llvm::raw_string_ostream OS(Buffer_);
 
-    auto Decl = clang::dyn_cast<clang::VarDecl>(DeclRefExpr->getDecl());
+    const auto *Decl = clang::dyn_cast<clang::VarDecl>(DeclRefExpr->getDecl());
     if (!Decl)
         return;
 
@@ -294,5 +289,8 @@ void ASTVisitor::doVisitDeclRefExpr(const clang::DeclRefExpr *DeclRefExpr)
         return;
     }
 
-    add(Decl);
+    if (isVisited(Decl))
+        return;
+
+    Result_.VarDeclVec.push_back(Decl);
 }

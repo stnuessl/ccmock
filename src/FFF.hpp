@@ -24,7 +24,7 @@ class FFF : public Generator {
 public:
     FFF(std::shared_ptr<const Config> Config, clang::PrintingPolicy Policy);
 
-    virtual void run() override;
+    void run() override;
 
 private:
     void writeSettings();

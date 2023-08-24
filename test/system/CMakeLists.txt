@@ -22,7 +22,8 @@ add_dependencies(tarball system-tests)
 
 set(FFF_INCLUDE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/common/include)
 
-add_subdirectory(basic)
+add_subdirectory(c-code)
+add_subdirectory(cxx-code)
 add_subdirectory(scripts)
 
 if(GIT)

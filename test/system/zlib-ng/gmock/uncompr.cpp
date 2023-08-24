@@ -28,22 +28,22 @@ extern "C" {
 
 #include "uncompr.inc"
 
-TEST(uncompress, 001)
+TEST_F(CCMockFixture, Uncompress001)
 {
     const unsigned char src[] = {0xff};
     unsigned char dst[1];
     z_size_t size = std::size(dst);
 
-    EXPECT_CALL(mock,
+    EXPECT_CALL(_,
                 PREFIX(inflateInit_)(testing::_,
                                      testing::StrEq(ZLIBNG_VERSION),
                                      (int32_t) sizeof(PREFIX3(stream))))
         .WillOnce(testing::Return(Z_OK));
 
-    EXPECT_CALL(mock, PREFIX(inflate)(testing::_, Z_NO_FLUSH))
+    EXPECT_CALL(_, PREFIX(inflate)(testing::_, Z_NO_FLUSH))
         .WillOnce(testing::Return(Z_STREAM_END));
 
-    EXPECT_CALL(mock, PREFIX(inflateEnd)(testing::_));
+    EXPECT_CALL(_, PREFIX(inflateEnd)(testing::_));
 
     ASSERT_EQ(Z_OK, PREFIX(uncompress)(dst, &size, src, std::size(src)));
 }

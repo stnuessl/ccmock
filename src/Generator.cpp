@@ -29,9 +29,9 @@ Generator::Generator(std::shared_ptr<const Config> Config,
       PrintingPolicy_(Policy),
       Buffer_(),
       Out_(Buffer_),
-      Functions_(),
-      Methods_(),
-      Variables_(),
+      FuncDeclVec_(),
+      VarDeclVec_(),
+      AnyVariadic_(false),
       Backend_(Backend)
 {
     Buffer_.reserve(BUFSIZ);
@@ -39,37 +39,128 @@ Generator::Generator(std::shared_ptr<const Config> Config,
 
 void Generator::HandleTranslationUnit(clang::ASTContext &Context)
 {
-    auto Visitor = ASTVisitor(Config_, Context);
-    (void) Visitor.TraverseDecl(Context.getTranslationUnitDecl());
+    auto Result = ASTVisitor::run(Config_, Context);
 
-    auto &Result = Visitor.result();
-
-    auto N = Result.Decls.size();
-    Functions_.reserve(N);
-    Methods_.reserve(N);
-    Variables_.reserve(N);
+    FuncDeclMap_ = std::move(Result.FuncDeclMap);
+    VarDeclVec_ = std::move(Result.VarDeclVec);
 
     AnyVariadic_ = Result.AnyVariadic;
-
-    for (auto Decl : Result.Decls) {
-        switch (Decl->getKind()) {
-        case clang::Decl::Function:
-            Functions_.push_back(llvm::cast<const clang::FunctionDecl>(Decl));
-            break;
-        case clang::Decl::CXXMethod:
-            Methods_.push_back(llvm::cast<const clang::CXXMethodDecl>(Decl));
-            break;
-        case clang::Decl::Var:
-            Variables_.push_back(llvm::cast<const clang::VarDecl>(Decl));
-            break;
-        default:
-            break;
-        }
-    }
-
+    
     writeFileHeader();
     run();
     write();
+}
+
+/* 
+ * clang provides its own clang::getOperatorSpelling function but some 
+ * returned strings there are not usable as C++ identifiers.
+ */
+llvm::StringRef Generator::getMockName(const clang::FunctionDecl *Decl)
+{
+    switch (Decl->getKind()) {
+    case clang::Decl::CXXConstructor:
+        return "constructor";
+    case clang::Decl::CXXDestructor:
+        return "destructor";
+    default:
+        break;
+    }
+
+    switch (Decl->getOverloadedOperator())  {
+    case clang::OO_None:
+        return Decl->getName();
+    case clang::OO_New:
+        return "op_new";
+    case clang::OO_Delete:
+        return "op_delete";
+    case clang::OO_Array_New:
+        return "op_array_new";
+    case clang::OO_Array_Delete:
+        return "op_array_delete";
+    case clang::OO_Plus:
+        return "op_plus";
+    case clang::OO_Minus:
+        return "op_minus";
+    case clang::OO_Star:
+        return "op_star";
+    case clang::OO_Slash:
+        return "op_slash";
+    case clang::OO_Percent:
+        return "op_percent";
+    case clang::OO_Caret:
+        return "op_caret";
+    case clang::OO_Amp:
+        return "op_amp";
+    case clang::OO_Pipe:
+        return "op_pipe";
+    case clang::OO_Tilde:
+        return "op_tilde";
+    case clang::OO_Exclaim:
+        return "op_exclaim";
+    case clang::OO_Equal:
+        return "op_equal";
+    case clang::OO_Less:
+        return "op_less";
+    case clang::OO_Greater:
+        return "op_greater";
+    case clang::OO_PlusEqual:
+        return "op_plus_equal";
+    case clang::OO_MinusEqual:
+        return "op_minus_equal";
+    case clang::OO_StarEqual:
+        return "op_star_equal";
+    case clang::OO_SlashEqual:
+        return "op_slash_equal";
+    case clang::OO_PercentEqual:
+        return "op_percent_equal";
+    case clang::OO_CaretEqual:
+        return "op_caret_equal";
+    case clang::OO_AmpEqual:
+        return "op_amp_equal";
+    case clang::OO_PipeEqual:
+        return "op_pipe_equal";
+    case clang::OO_LessLess:
+        return "op_less_less";
+    case clang::OO_GreaterGreater:
+        return "op_greater_greater";
+    case clang::OO_LessLessEqual:
+        return "op_less_less_equal";
+    case clang::OO_GreaterGreaterEqual:
+        return "op_greater_greater_equal";
+    case clang::OO_EqualEqual:
+        return "op_equal_equal";
+    case clang::OO_ExclaimEqual:
+        return "op_exclaim_equal";
+    case clang::OO_LessEqual:
+        return "op_less_equal";
+    case clang::OO_GreaterEqual:
+        return "op_greater_equal";
+    case clang::OO_Spaceship:
+        return "op_spaceship";
+    case clang::OO_AmpAmp:
+        return "op_amp_amp";
+    case clang::OO_PipePipe:
+        return "op_pipe_pipe";
+    case clang::OO_PlusPlus:
+        return "op_plus_plus";
+    case clang::OO_MinusMinus:
+        return "op_minus_minus";
+    case clang::OO_Comma:
+        return "op_comma";
+    case clang::OO_ArrowStar:
+        return "op_arrow_star";
+    case clang::OO_Arrow:
+        return "op_arrow";
+    case clang::OO_Call:
+        return "op_call";
+    case clang::OO_Subscript:
+        return "op_subscript";
+    default:
+        llvm_unreachable("unknown overloaded operator");
+        break;
+    }
+
+    return "";
 }
 
 void Generator::writeFileHeader()
@@ -82,16 +173,17 @@ void Generator::writeFileHeader()
 
     if (Config_->General.WriteDate) {
         /* Looks like I do not understand std::chrono... */
-        char buf[64];
-        struct tm tm;
+        constexpr std::size_t buf_size = 64;
+        auto buf = std::array<char, buf_size>();
+        struct tm tm = ::tm();
 
         auto Now = std::time(nullptr);
         (void) gmtime_r(&Now, &tm);
 
-        std::strftime(buf, std::size(buf), "%FT%T%z", &tm);
+        auto size = std::strftime(buf.data(), std::size(buf), "%FT%T%z", &tm);
 
         Out_ << 
-" *     Date        : " << buf << "\n";
+" *     Date        : " << std::string_view(buf.data(), size)  << "\n";
     }
 
     auto &Base = Config_->General.BaseDirectory;
@@ -103,9 +195,9 @@ void Generator::writeFileHeader()
 
     Out_ <<
 " *     Backend     : " << Backend_ << "\n"
+" *     Directory   : " << Base << "\n"
 " *     Input       : " << Input << "\n"
 " *     Output      : " << Output << "\n"
-" *     Directory   : " << Base << "\n"
 " */\n";
 
     /* clang-format off */
@@ -113,23 +205,34 @@ void Generator::writeFileHeader()
 
 void Generator::write() const
 {
-    std::error_code error;
+    auto &Path = Config_->General.Output.native();
 
-    if (Config_->General.Output.empty()) {
+    if (Path.empty()) {
         llvm::outs() << Buffer_ << "\n";
-        return;
-    }
+    } else {
+        std::error_code error;
 
-    auto Out = llvm::raw_fd_stream(Config_->General.Output.native(), error);
-    if (error) {
-        llvm::errs() << util::cl::error() 
-                     << "failed to open \""
-                     << Config_->General.Output.native()
-                     << "\": " << error.message() << "\n";
-        std::exit(EXIT_FAILURE);
-    }
+        auto Out = llvm::raw_fd_ostream(Path, error);
+        if (error) {
+            llvm::errs() << util::cl::error() 
+                         << "failed to open \""
+                         << Config_->General.Output.native()
+                         << "\": " << error.message() << "\n";
+            std::exit(EXIT_FAILURE);
+        }
 
-    Out << Buffer_ << "\n";
+        Out << Buffer_ << "\n";
+    }
+    
+    if (Config_->General.Verbose) {
+        llvm::errs() << util::cl::info()
+                     << "wrote " << Buffer_.size() + 1 << " bytes to ";
+
+        if (Path.empty())
+            llvm::errs() << "standard output\n";
+        else
+            llvm::errs() << "\"" << Path << "\"\n";
+    }
 }
 
 void Generator::writeMacroDefinitions()
@@ -146,7 +249,7 @@ void Generator::writeMacroDefinitions()
 
 void Generator::writeGlobalVariables()
 {
-    for (auto &Decl : Variables_) {
+    for (auto &Decl : VarDeclVec_) {
         auto Type = Decl->getType();
 
         /* 
@@ -164,16 +267,16 @@ void Generator::writeGlobalVariables()
         }
         
         auto &Context = Decl->getASTContext();
-        auto VarDecl = util::decl::fakeVarDecl(Context, Type, Decl->getName());
+        auto *VarDecl = util::decl::fakeVarDecl(Context, Type, Decl->getName());
         VarDecl->print(Out_, PrintingPolicy_);
         Out_ << ";\n";
     }
 
-    if (!Variables_.empty())
+    if (!VarDeclVec_.empty())
         Out_ << "\n";
 }
 
-void Generator::writeFunctionParameterList(const clang::FunctionDecl *Decl)
+void Generator::writeFunctionParameterList(const clang::FunctionDecl *Decl, bool ParameterNames, bool VarArgList)
 {
     auto Parameters = Decl->parameters();
 
@@ -192,6 +295,11 @@ void Generator::writeFunctionParameterList(const clang::FunctionDecl *Decl)
         if (i != 0)
             Out_ << ", ";
 
+        if (!ParameterNames) {
+            writeType(Parameters[i]->getType());
+            continue;
+        }
+
         /* Ensure that every parameter will have a name associated to it */
         if (!Parameters[i]->getName().empty()) {
             Parameters[i]->print(Out_, PrintingPolicy_);
@@ -202,7 +310,7 @@ void Generator::writeFunctionParameterList(const clang::FunctionDecl *Decl)
         auto Pointee = Type->getPointeeType();
 
         if (Pointee.isNull() || !Pointee->isFunctionType()) {
-            Type.print(Out_, PrintingPolicy_);
+            writeType(Type);
 
             /*
              * We need to be aware of something like "char *const ptr;".
@@ -234,12 +342,16 @@ void Generator::writeFunctionParameterList(const clang::FunctionDecl *Decl)
         OS << "arg" << i + 1;
 
         auto &Context = Decl->getASTContext();
-        auto VarDecl = util::decl::fakeVarDecl(Context, Type, Name);
+        auto *VarDecl = util::decl::fakeVarDecl(Context, Type, Name);
         VarDecl->print(Out_, PrintingPolicy_);
     }
 
-    if (Decl->isVariadic())
-        Out_ << ", ...";
+    if (Decl->isVariadic()) {
+        if (VarArgList)
+            Out_ << ", va_list";
+        else
+            Out_ << ", ...";
+    }
 
     Out_ << ")";
 }

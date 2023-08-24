@@ -32,7 +32,9 @@ endif()
 
 # Disable cmake default flags
 set(CMAKE_CXX_FLAGS_DEBUG "")
+set(CMAKE_CXX_FLAGS_MINSIZEREL "")
 set(CMAKE_CXX_FLAGS_RELEASE "")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "")
 
 # Ensure that there really is only just one timestamp 
 # throughout the whole build.

@@ -19,15 +19,28 @@
 extern "C" {
 #endif
 
-void app_print(const char *fmt, ...);
-int app_main(int argc, char *argv[]);
+#include "fac.h"
 
 #ifdef __cplusplus
 }
 #endif
 
-#include "app.inc"
+#include "fac.inc"
 
-TEST(main, basic)
+TEST_F(CCMockFixture, Fac01)
 {
+    ASSERT_EQ(1, fac(0));
+    ASSERT_EQ(1, fac(1));
+
+    EXPECT_CALL(_, mul(testing::_, testing::_))
+        .Times(testing::Exactly(2))
+        .WillRepeatedly(testing::Invoke([](int a, int b) { return a * b; }));
+
+    ASSERT_EQ(6, fac(3));
+
+    EXPECT_CALL(_, mul(testing::_, testing::_))
+        .Times(testing::Exactly(3))
+        .WillRepeatedly(testing::Invoke([](int a, int b) { return a * b; }));
+
+    ASSERT_EQ(24, fac(4));
 }

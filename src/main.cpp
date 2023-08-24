@@ -36,6 +36,11 @@
 
 /* clang-format off */
 
+/* 
+ * NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
+ * These variables cannot be const-qualified as the interface requirements
+ * for the command-line parsing utilities are expecting them to be mutable.
+ */
 static llvm::cl::OptionCategory ToolCategory("Tool Options");
 
 
@@ -180,7 +185,8 @@ static llvm::cl::alias ForceAlias(
 static llvm::cl::opt<bool> Verbose(
     "verbose",
     llvm::cl::desc(
-        ""
+        "Turn on verbose output. Writes informational messages to standard "
+        "output."
     ),
     llvm::cl::init(false),
     llvm::cl::cat(ToolCategory)
@@ -252,6 +258,7 @@ static llvm::cl::opt<std::string> ResourceDirectory(
     llvm::cl::cat(ToolCategory)
 );
 
+/* NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables) */
 /* clang-format on */
 
 class ExtraArgumentsAdjuster {
@@ -316,6 +323,7 @@ private:
     llvm::StringMap<int> RemoveArgs_;
 };
 
+/* NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays) */
 __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
 {
     llvm::StringRef Overview = "";
@@ -428,6 +436,7 @@ __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
         Path = std::filesystem::absolute(Path);
     }
 
+    /* Enable or disable colored output */
     switch (Config->General.ColorMode) {
     case Config::COLORMODE_AUTO:
         break;

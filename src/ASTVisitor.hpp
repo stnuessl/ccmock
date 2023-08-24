@@ -32,30 +32,34 @@ public:
     public:
         Result() = default;
 
-        std::vector<const clang::DeclaratorDecl *> Decls;
+        llvm::DenseMap<
+            const clang::DeclContext *, 
+            std::vector<const clang::FunctionDecl *>
+        > FuncDeclMap;
+        std::vector<const clang::VarDecl *> VarDeclVec;
         bool AnyVariadic;
     };
 
-    ASTVisitor(std::shared_ptr<const Config> Config,
-               clang::ASTContext &Context);
-
+    static inline Result run(std::shared_ptr<const Config> Config,
+                             clang::ASTContext &Context);
+                      
     bool VisitCallExpr(clang::CallExpr *CallExpr);
     bool VisitCXXConstructExpr(clang::CXXConstructExpr *ConstructExpr);
     bool VisitDeclRefExpr(clang::DeclRefExpr *DeclRefExpr);
 
     inline bool shouldWalkTypesOfTypeLocs() const;
-
-    inline const Result &result() const &;
-    inline Result result() &&;
-
 private:
+    ASTVisitor(std::shared_ptr<const Config> Config,
+               clang::ASTContext &Context);
+
     void dispatch(const clang::Expr *Expr,
                   const clang::FunctionDecl *FunctionDecl);
-    void add(const clang::DeclaratorDecl *Decl);
+    bool isVisited(const clang::DeclaratorDecl *Decl);
 
     void doVisitCallExpr(const clang::CallExpr *CallExpr);
     void doVisitCXXConstructExpr(const clang::CXXConstructExpr *ConstructExpr);
     void doVisitDeclRefExpr(const clang::DeclRefExpr *DeclRefExpr);
+
 
     std::shared_ptr<const Config> Config_;
     std::string Buffer_;
@@ -72,14 +76,14 @@ inline bool ASTVisitor::shouldWalkTypesOfTypeLocs() const
     return false;
 }
 
-inline const ASTVisitor::Result &ASTVisitor::result() const &
+inline ASTVisitor::Result ASTVisitor::run(std::shared_ptr<const Config> Config,
+                                           clang::ASTContext &Context)
 {
-    return Result_;
-}
+    ASTVisitor Visitor(std::move(Config), Context);
 
-inline ASTVisitor::Result ASTVisitor::result() &&
-{
-    return std::move(Result_);
+    Visitor.TraverseDecl(Context.getTranslationUnitDecl());
+
+    return std::move(Visitor.Result_);
 }
 
 #endif /* AST_VISITOR_HPP_ */

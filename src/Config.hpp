@@ -85,8 +85,9 @@ public:
         GMockSection();
 
         std::string MockType;
-        std::string MockName;
-        std::string MockSuffix;
+        std::string ClassName;
+        std::string GlobalNamespaceName;
+        std::string TestFixtureName;
         bool WriteMain;
     };
 

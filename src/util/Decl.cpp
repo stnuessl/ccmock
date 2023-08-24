@@ -26,7 +26,7 @@ clang::VarDecl *fakeVarDecl(clang::ASTContext &Context,
                             clang::QualType Type,
                             llvm::StringRef Name)
 {
-    auto TranslationUnitDecl = Context.getTranslationUnitDecl();
+    auto *TranslationUnitDecl = Context.getTranslationUnitDecl();
     auto Loc = clang::SourceLocation();
     auto &IdInfo = Context.Idents.getOwn(Name);
 
@@ -38,7 +38,17 @@ clang::VarDecl *fakeVarDecl(clang::ASTContext &Context,
                                   Type,
                                   nullptr,
                                   clang::StorageClass::SC_None);
-} /* namespace decl */
-} // namespace decl
+}
 
-} // namespace util
+void collectAllContexts(const clang::DeclContext *Context,
+                     llvm::SmallVectorImpl<const clang::DeclContext *> &Vec)
+{
+    while (Context) {
+        Vec.push_back(Context);
+        Context = Context->getParent();
+    }
+}
+
+} /* namespace decl */
+
+} /* namespace util */

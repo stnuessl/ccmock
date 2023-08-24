@@ -24,7 +24,7 @@ class CMocka : public Generator {
 public:
     CMocka(std::shared_ptr<const Config> Config, clang::PrintingPolicy Policy);
 
-    virtual void run() override;
+    void run() override;
 
 private:
     void writeIncludeDirectives();

@@ -31,26 +31,32 @@ public:
               clang::PrintingPolicy Policy,
               llvm::StringRef Backend);
 
-    virtual void HandleTranslationUnit(clang::ASTContext &Context) override;
+    void HandleTranslationUnit(clang::ASTContext &Context) override;
     virtual void run() = 0;
 
+    static llvm::StringRef getMockName(const clang::FunctionDecl *Decl);
 protected:
     void writeMacroDefinitions();
     void writeGlobalVariables();
     inline void writeType(clang::QualType Type);
     inline void writeReturnType(const clang::FunctionDecl *Decl);
-    inline void writeQualifiedName(const clang::FunctionDecl *Decl);
-    void writeFunctionParameterList(const clang::FunctionDecl *Decl);
+    inline void writeQualifiedName(const clang::NamedDecl *Decl);
+    void writeFunctionParameterList(const clang::FunctionDecl *Decl, bool ParameterNames = true, bool VarArgList = false);
 
+    /* NOLINTBEGIN(cppcoreguidelines-non-private-member-variables-in-classes) */
     std::shared_ptr<const Config> Config_;
     clang::PrintingPolicy PrintingPolicy_;
     std::string Buffer_;
     llvm::raw_string_ostream Out_;
-    std::vector<const clang::FunctionDecl *> Functions_;
-    std::vector<const clang::CXXMethodDecl *> Methods_;
-    std::vector<const clang::DeclaratorDecl *> Variables_;
+    std::vector<const clang::FunctionDecl *> FuncDeclVec_;
+    llvm::DenseMap<
+        const clang::DeclContext *, 
+        std::vector<const clang::FunctionDecl *>
+    > FuncDeclMap_;
+    std::vector<const clang::VarDecl *> VarDeclVec_;
 
     bool AnyVariadic_;
+    /* NOLINTEND(cppcoreguidelines-non-private-member-variables-in-classes) */
 
 private:
     void writeFileHeader();
@@ -61,6 +67,7 @@ private:
 
 inline void Generator::writeType(clang::QualType Type)
 {
+    Type = Type.getCanonicalType();
     Type.print(Out_, PrintingPolicy_);
 }
 
@@ -69,7 +76,7 @@ inline void Generator::writeReturnType(const clang::FunctionDecl *Decl)
     writeType(Decl->getReturnType());
 }
 
-inline void Generator::writeQualifiedName(const clang::FunctionDecl *Decl)
+inline void Generator::writeQualifiedName(const clang::NamedDecl *Decl)
 {
     Decl->printQualifiedName(Out_, PrintingPolicy_);
 }

@@ -45,17 +45,21 @@ void CMocka::writeIncludeDirectives()
 
 void CMocka::writeMockFunctions()
 {
-    for (auto &Decl : Functions_) {
-        if (Decl->isExternC())
-            Out_ << "CCMOCK_DECL ";
+    for (const auto &[DeclContext, FuncDeclVec] : FuncDeclMap_) {
+        (void) DeclContext;
 
-        writeReturnType(Decl);
-        Out_ << "\n";
-        writeQualifiedName(Decl);
-        writeFunctionParameterList(Decl);
-        Out_ << "\n";
-        writeFunctionBody(Decl);
-        Out_ << "\n";
+        for (auto &Decl : FuncDeclVec) {
+            if (Decl->isExternC())
+                Out_ << "CCMOCK_DECL ";
+
+            writeReturnType(Decl);
+            Out_ << "\n";
+            writeQualifiedName(Decl);
+            writeFunctionParameterList(Decl);
+            Out_ << "\n";
+            writeFunctionBody(Decl);
+            Out_ << "\n";
+        }
     }
 }
 
@@ -93,7 +97,7 @@ void CMocka::writeFunctionBody(const clang::FunctionDecl *Decl)
     if (!Parameters.empty()) {
         Out_ << "\n";
 
-        for (int i = 0, N = Parameters.size(); i < N; ++i) {
+        for (unsigned int i = 0, N = Parameters.size(); i < N; ++i) {
             if (Parameters[i]->getType()->isPointerType())
                 Out_ << "    check_expected_ptr(";
             else
@@ -112,7 +116,7 @@ void CMocka::writeFunctionBody(const clang::FunctionDecl *Decl)
         Out_ << "\n";
 
         /* Treat non-const pointer as output parameters */
-        for (int i = 0, N = Parameters.size(); i < N; ++i) {
+        for (unsigned int i = 0, N = Parameters.size(); i < N; ++i) {
             auto Type = Parameters[i]->getType();
 
             if (!IsOutParam(Parameters[i]))

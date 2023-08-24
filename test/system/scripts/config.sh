@@ -27,13 +27,13 @@ function validate_gmock_section() {
         exit 1
     fi
 
-    if ! echo "${result}" | grep "MockName:\s*MyMockName" > /dev/null; then
-        echo "error: \"MockName\": invalid value"
+    if ! echo "${result}" | grep "ClassName:\s*MyClassName" > /dev/null; then
+        echo "error: \"ClassName\": invalid value"
         exit 1
     fi
 
-    if ! echo "${result}" | grep "MockSuffix:\s*MyMockSuffix" > /dev/null; then
-        echo "error: \"MockSuffix\": invalid value"
+    if ! echo "${result}" | grep "GlobalNamespaceName:\s*MyNamespaceName" > /dev/null; then
+        echo "error: \"GlobalNamespaceName\": invalid value"
         exit 1
     fi
 

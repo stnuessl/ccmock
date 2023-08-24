@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022   Steffen Nuessle
+ * Copyright (C) 2023   Steffen Nuessle
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,34 +15,36 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+namespace detail {
 
-#include "../src/functable.h"
-#include "../src/zbuild.h"
-#include "../src/zlib-ng.h"
+class value {
+public:
+    value() = default;
+    value(const value &other) = default;
+    value(value &&other) = default;
+    ~value() = default;
 
-/*
- * Function declarations which are not availabie via header files.
- * Be aware that these functions need C linkage .
- */
-uint32_t adler32_c(uint32_t adler, const unsigned char *buf, size_t len);
+    void operator()() const;
 
-#ifdef __cplusplus
-}
-#endif
+    value &operator=(const value &other);
+    value &operator=(value &&other) noexcept = default;
 
-/* zlib-ng and gtest both define their own "Assert" ... */
-#ifdef Assert
-#undef Assert
-#endif
+    value operator++();
+    const value operator++(int);
+};
 
-#include "adler32.inc"
+} /* namespace detail */
 
-TEST_F(CCMockFixture, Adler32C)
+void run()
 {
-    functable.adler32 = &adler32_c;
+    auto var1 = detail::value();
+    auto var2 = detail::value();
 
-    ASSERT_EQ(1, adler32_c(0, nullptr, 0));
+    var2 = var1;
+
+    ++var1;
+    var2++;
+
+    var1();
+    var2();
 }

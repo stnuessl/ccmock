@@ -15,8 +15,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <clang/Tooling/JSONCompilationDatabase.h>
 #include <clang/Tooling/CompilationDatabase.h>
+#include <clang/Tooling/JSONCompilationDatabase.h>
 
 #include "CompilationDatabase.hpp"
 
@@ -54,8 +54,9 @@ void CompilationDatabase::detect(const std::filesystem::path &Path,
         return;
 
     /* 
-     * Fallback: Assume trivial compile commands. This also allows to specifiy
-     * additional compiler arguments via "--extra-arg" on the command-line.
+     * Fallback: Assume trivial compile commands. This allows to specifiy
+     * additional compiler arguments via "--extra-arg" on the command-line
+     * without running into an error.
      */
     auto Directory = llvm::sys::path::parent_path(Path.native());
 

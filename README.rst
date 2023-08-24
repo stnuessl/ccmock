@@ -243,6 +243,7 @@ Open Points
 * Generate global variable definitions
 * Restructure test tree
 * Automatic include handling
-* provide multiple test runners
-* add support for another mock library (cpputest?)
+* Provide multiple test runners (gtest, unity?, ctest?)
+* Add support for another mock library (cpputest?)
+* Implement own mocking functionality
 * --backend None to just print prototypes

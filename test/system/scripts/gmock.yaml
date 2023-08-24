@@ -1,7 +1,7 @@
 ---
 GMock:
   MockType: NiceMock
-  MockName: MyMockName
-  MockSuffix: MyMockSuffix
+  ClassName: MyClassName
+  GlobalNamespaceName: MyNamespaceName
   WriteMain: false
 ...

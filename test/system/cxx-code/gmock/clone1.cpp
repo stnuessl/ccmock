@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022   Steffen Nuessle
+ * Copyright (C) 2023   Steffen Nuessle
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,34 +15,20 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "../src/clone1.cpp"
+#include "clone1.inc"
 
-#include "../src/functable.h"
-#include "../src/zbuild.h"
-#include "../src/zlib-ng.h"
-
-/*
- * Function declarations which are not availabie via header files.
- * Be aware that these functions need C linkage .
- */
-uint32_t adler32_c(uint32_t adler, const unsigned char *buf, size_t len);
-
-#ifdef __cplusplus
-}
-#endif
-
-/* zlib-ng and gtest both define their own "Assert" ... */
-#ifdef Assert
-#undef Assert
-#endif
-
-#include "adler32.inc"
-
-TEST_F(CCMockFixture, Adler32C)
+TEST_F(CCMockFixture, run001)
 {
-    functable.adler32 = &adler32_c;
+    testing::Sequence s1;
 
-    ASSERT_EQ(1, adler32_c(0, nullptr, 0));
+    EXPECT_CALL(n1.n2, run(testing::Matcher(0))).InSequence(s1);
+    EXPECT_CALL(n1.n2, run(testing::Matcher(0.0))).InSequence(s1);
+    EXPECT_CALL(n1.n2.n3, run(testing::Matcher(1))).InSequence(s1);
+    EXPECT_CALL(n1.n2.n3, run(testing::Matcher(1.0))).InSequence(s1);
+    
+    EXPECT_CALL(n1.n2, dispatch()).InSequence(s1);
+    EXPECT_CALL(n1.n2.n3, dispatch()).InSequence(s1);
+
+    run();
 }

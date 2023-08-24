@@ -37,7 +37,7 @@ void crc_reset(deflate_state *const s);
 
 #include "crc32.inc"
 
-TEST(crc_reset, 001)
+TEST_F(CCMockFixture, CrcReset001)
 {
     deflate_state state;
     PREFIX3(stream) strm;
@@ -48,9 +48,9 @@ TEST(crc_reset, 001)
 #ifdef X86_PCLMULQDQ_CRC
     x86_cpu_has_pclmulqdq = 1;
 
-    EXPECT_CALL(mock, x86_check_features()).Times(1);
+    EXPECT_CALL(_, x86_check_features()).Times(1);
 
-    EXPECT_CALL(mock, crc_fold_init(&state))
+    EXPECT_CALL(_, crc_fold_init(&state))
         .WillOnce(testing::Assign(&state.strm->adler, 0));
 #endif
 
@@ -59,7 +59,7 @@ TEST(crc_reset, 001)
     ASSERT_EQ(0, state.strm->adler);
 }
 
-TEST(crc_reset, 002)
+TEST_F(CCMockFixture, CrcReset002)
 {
     deflate_state state;
     PREFIX3(stream) strm;
@@ -70,7 +70,7 @@ TEST(crc_reset, 002)
 #ifdef X86_PCLMULQDQ_CRC
     x86_cpu_has_pclmulqdq = 0;
 
-    EXPECT_CALL(mock, x86_check_features()).Times(1);
+    EXPECT_CALL(_, x86_check_features()).Times(1);
 #endif
 
     crc_reset(&state);

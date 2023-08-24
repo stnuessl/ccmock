@@ -15,14 +15,13 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "fac.h"
+#include <stdlib.h>
 
-int mul(int x, int y);
+void callback_invoke1(void *(*) (void *, void *) );
+void callback_invoke2(int (*(*func)(long num))(int a, int b));
 
-int fac(int n)
+void callback_main(void)
 {
-    if (n < 2)
-        return 1;
-
-    return mul(n, fac(n - 1));
+    callback_invoke1(NULL);
+    callback_invoke2(NULL);
 }
