@@ -98,7 +98,6 @@ add_executable(
     src/main.cpp
     src/ASTVisitor.cpp
     src/GMock.cpp
-    src/ActionFactory.cpp
 )
 
 set_target_properties(

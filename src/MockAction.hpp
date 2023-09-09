@@ -19,30 +19,28 @@
 #define MOCK_ACTION_HPP_
 
 #include <clang/Frontend/FrontendAction.h>
+#include <clang/Tooling/Tooling.h>
 #include <memory>
 
 #include "Config.hpp"
 
-class MockAction : public clang::ASTFrontendAction {
+class MockActionFactory : public clang::tooling::FrontendActionFactory {
 public:
-    MockAction() = default;
+    MockActionFactory() = default;
 
     inline void setConfig(std::shared_ptr<const Config> Config);
 
-protected:
-    virtual std::unique_ptr<clang::ASTConsumer>
-    CreateASTConsumer(clang::CompilerInstance &CI,
-                      llvm::StringRef File) override;
+    std::unique_ptr<clang::FrontendAction> create() override;
 
-    virtual bool PrepareToExecuteAction(clang::CompilerInstance &CI) override;
-    virtual void EndSourceFileAction() override;
-
+private:
     std::shared_ptr<const Config> Config_;
 };
 
-inline void MockAction::setConfig(std::shared_ptr<const Config> Config)
+inline void MockActionFactory::setConfig(std::shared_ptr<const Config> Config)
 {
     Config_ = std::move(Config);
 }
+
+
 
 #endif /* MOCK_ACTION_HPP_ */

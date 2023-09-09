@@ -19,7 +19,7 @@ add_custom_target(unit-tests)
 
 set(
     UNIT_TEST_SOURCES
-    src/ActionFactory.cpp
+    src/MockAction.cpp
 )
 
 foreach(UT_SOURCE ${UNIT_TEST_SOURCES})

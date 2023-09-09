@@ -23,16 +23,37 @@
 #include "CMocka.hpp"
 #include "FFF.hpp"
 #include "GMock.hpp"
-#include "util/commandline.hpp"
 
 namespace {
 
+class MockAction : public clang::ASTFrontendAction {
+public:
+    MockAction() = default;
+
+    inline void setConfig(std::shared_ptr<const Config> Config);
+
+protected:
+    std::unique_ptr<clang::ASTConsumer>
+    CreateASTConsumer(clang::CompilerInstance &CI,
+                      llvm::StringRef File) override;
+
+    bool PrepareToExecuteAction(clang::CompilerInstance &CI) override;
+
+private:
+    std::shared_ptr<const Config> Config_;
+};
+
+inline void MockAction::setConfig(std::shared_ptr<const Config> Config)
+{
+    Config_ = std::move(Config);
+}
+
 std::string DetectClangResourceDirectory()
 {
-    std::filesystem::path PathList[] = {
+    std::array<std::filesystem::path, 3> PathList = {
         "/usr/lib/clang",
         "/usr/lib64/clang",
-        "/lib/clang",
+        "/lib/clang",    
     };
 
     for (const auto &Item : PathList) {
@@ -52,8 +73,6 @@ std::string DetectClangResourceDirectory()
 
     return std::string();
 }
-
-} // namespace
 
 std::unique_ptr<clang::ASTConsumer>
 MockAction::CreateASTConsumer(clang::CompilerInstance &CI, llvm::StringRef File)
@@ -113,6 +132,12 @@ bool MockAction::PrepareToExecuteAction(clang::CompilerInstance &CI)
     return true;
 }
 
-void MockAction::EndSourceFileAction()
+} // namespace
+
+std::unique_ptr<clang::FrontendAction> MockActionFactory::create()
 {
+    auto Action = std::make_unique<MockAction>();
+    Action->setConfig(Config_);
+
+    return Action;
 }

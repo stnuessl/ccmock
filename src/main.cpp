@@ -26,7 +26,7 @@
 
 #include "util/commandline.hpp"
 
-#include "ActionFactory.hpp"
+#include "MockAction.hpp"
 #include "CompilationDatabase.hpp"
 #include "Config.hpp"
 
@@ -470,7 +470,7 @@ __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
         std::exit(EXIT_FAILURE);
     }
 
-    auto Factory = ActionFactory();
+    auto Factory = MockActionFactory();
     Factory.setConfig(Config);
 
     /* Perform the ClangTool invocation */
