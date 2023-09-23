@@ -95,9 +95,7 @@ function(add_cppcheck)
                 --inline-suppr
                 --library=posix
                 --platform=native
-                --suppress=allocaCalled
-                --suppress=missingInclude
-                --suppress=readdirCalled
+                --suppress=missingIncludeSystem
                 --suppress=unusedFunction
                 --template=gcc
                 --quiet

@@ -104,7 +104,7 @@ add_executable(
 set_target_properties(
     ${CMAKE_PROJECT_NAME}
     PROPERTIES EXPORT_COMPILE_COMMANDS ON
-               CXX_STANDARD 20
+               CXX_STANDARD 17
                CXX_STANDARD_REQUIRED ON
                INTERPROCEDURAL_OPTIMIZATION_DEBUG FALSE
                INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
@@ -125,6 +125,12 @@ set_property(
     PROPERTY LINK_OPTIONS 
 )
 
+target_include_directories(
+    ${CMAKE_PROJECT_NAME}
+    SYSTEM
+    PRIVATE
+    /usr/include
+)
 target_include_directories(
     ${CMAKE_PROJECT_NAME}
     PRIVATE src

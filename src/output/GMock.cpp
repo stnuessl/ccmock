@@ -102,7 +102,6 @@ void GMock::writeMockClass(const clang::DeclContext *Context, unsigned int Inden
 
         writeMockClass(Context, Name, Indent);
         break;
-       break;
     case clang::Decl::Function:
     case clang::Decl::CXXConstructor:
     case clang::Decl::CXXDestructor:

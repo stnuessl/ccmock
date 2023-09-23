@@ -77,7 +77,7 @@ function(add_clang_analysis)
     # Retrieve required properties of the target which shall be analyzed
     get_target_property(TARGET_SOURCE_DIRECTORY ${ARG_TARGET} SOURCE_DIR)
     get_target_property(TARGET_SOURCE_FILES ${ARG_TARGET} SOURCES)
-    get_target_property(CXX_STANDARD ${ARG_TARGET} CXX_STANDARD)
+    get_target_property(TARGET_CXX_STANDARD ${ARG_TARGET} CXX_STANDARD)
     get_target_property(COMPILE_DEFS ${ARG_TARGET} COMPILE_DEFINITIONS)
     get_target_property(INCLUDE_DIRS ${ARG_TARGET} INCLUDE_DIRECTORIES)
     get_target_property(COMPILE_OPTS ${ARG_TARGET} COMPILE_OPTIONS)
@@ -116,13 +116,14 @@ function(add_clang_analysis)
         add_custom_command(
             OUTPUT ${AST_FILE}
             COMMAND clang
-                    -std=c++${CXX_STANDARD}
+                    -std=c++${TARGET_CXX_STANDARD}
                     "${COMPILE_DEFS}"
                     "${INCLUDE_DIRS}"
                     "${COMPILE_OPTS}"
                     -emit-ast 
                     -o ${AST_FILE}
                     ${SOURCE_FILE}
+            DEPENDS ${SOURCE_FILE}
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
             COMMAND_EXPAND_LISTS
             VERBATIM
@@ -140,15 +141,11 @@ function(add_clang_analysis)
     add_custom_command(
         OUTPUT ${CLANG_EXTDEF_MAPPING}
         COMMAND clang-extdef-mapping
-                -p ${ARG_COMPILATION_DATABASE}
                 --extra-arg=-Wno-ignored-optimization-argument
-                ${SOURCE_FILES}
-                | sed 
-                -e s|${TARGET_SOURCE_DIRECTORY}/|${ARG_CACHE_DIRECTORY}/|g
-                -e s|\.cpp$|.ast|g
+                ${AST_FILES}
                 > ${CLANG_EXTDEF_MAPPING}
         DEPENDS ${ARG_COMPILATION_DATABASE}
-                ${SOURCE_FILES}
+                ${AST_FILES}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         VERBATIM
     )
@@ -182,7 +179,7 @@ function(add_clang_analysis)
         add_custom_command(
             OUTPUT ${OUTPUT_FILE}
             COMMAND clang 
-                    -std=c++${CXX_STANDARD}
+                    -std=c++${TARGET_CXX_STANDARD}
                     --analyze
                     --analyzer-output html
                     --output ${RESULT_DIRECTORY}
@@ -198,7 +195,7 @@ function(add_clang_analysis)
                     ${SOURCE_FILE}
                     && touch ${OUTPUT_FILE}
             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-            DEPENDS ${CLANG_EXTDEF_MAPPING} ${AST_FILES}
+            DEPENDS ${CLANG_EXTDEF_MAPPING} ${SOURCE_FILE}
             COMMAND_EXPAND_LISTS
             VERBATIM
         )

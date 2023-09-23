@@ -90,7 +90,7 @@ void OutputWriter::writeFunctionParameterList(const clang::FunctionDecl *Decl,
 
         auto &Context = Decl->getASTContext();
 
-        auto *VarDecl = util::decl::fakeVarDecl(Context, Type, Name);
+        const auto *VarDecl = util::decl::fakeVarDecl(Context, Type, Name);
         writeVarDecl(VarDecl);
     }
 

@@ -18,6 +18,9 @@
 #ifndef GLOB_HPP_
 #define GLOB_HPP_
 
+#include <llvm/ADT/STLExtras.h>
+#include <llvm/ADT/StringRef.h>
+
 namespace util {
 namespace glob {
 
@@ -25,7 +28,7 @@ static inline bool isPattern(llvm::StringRef Str)
 {
     auto Pred = [](char C) { return C == '?' || C == '*' || C == '['; };
 
-    return std::ranges::any_of(Str, Pred);
+    return llvm::any_of(Str, Pred);
 }
 
 } /* namespace glob */

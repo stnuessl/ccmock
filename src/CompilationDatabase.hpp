@@ -30,6 +30,8 @@
 
 class CompilationDatabase : public clang::tooling::CompilationDatabase {
 public:
+    CompilationDatabase() = default;
+
     inline void setIndex(unsigned int Num);
     void load(const std::filesystem::path &Path, std::string &Error);
     void detect(const std::filesystem::path &Path, std::string &Error);

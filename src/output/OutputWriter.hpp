@@ -24,7 +24,7 @@
 
 class OutputWriter {
 public:
-    inline OutputWriter(clang::PrintingPolicy Policy);
+    explicit inline OutputWriter(clang::PrintingPolicy Policy);
 
     inline void indent(unsigned int N);
     inline void writeDeclName(const clang::DeclContext *Context);

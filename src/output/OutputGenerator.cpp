@@ -57,7 +57,7 @@ private:
     const Config &getConfig() const;
 
     void dispatch(const clang::Expr *Expr,
-                  const clang::FunctionDecl *FunctionDecl);
+                  const clang::FunctionDecl *Decl);
     bool isVisited(const clang::DeclaratorDecl *Decl);
 
     void doVisitCallExpr(const clang::CallExpr *CallExpr);
