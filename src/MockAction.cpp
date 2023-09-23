@@ -20,9 +20,10 @@
 #include <clang/Frontend/CompilerInstance.h>
 #include <filesystem>
 
-#include "CMocka.hpp"
-#include "FFF.hpp"
-#include "GMock.hpp"
+#include "output/CMocka.hpp"
+#include "output/FFF.hpp"
+#include "output/GMock.hpp"
+#include "output/Raw.hpp"
 
 namespace {
 
@@ -92,6 +93,8 @@ MockAction::CreateASTConsumer(clang::CompilerInstance &CI, llvm::StringRef File)
         return std::make_unique<FFF>(Config_, Policy);
     case Config::BACKEND_CMOCKA:
         return std::make_unique<CMocka>(Config_, Policy);
+    case Config::BACKEND_RAW:
+        return std::make_unique<Raw>(Config_, Policy);
     default:
         llvm_unreachable("invalid output generator selected");
         break;

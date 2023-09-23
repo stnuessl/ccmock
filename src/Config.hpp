@@ -37,6 +37,7 @@ public:
         BACKEND_GMOCK,
         BACKEND_FFF,
         BACKEND_CMOCKA,
+        BACKEND_RAW,
     };
 
     struct ClangSection {

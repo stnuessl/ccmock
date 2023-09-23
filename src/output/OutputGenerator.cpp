@@ -327,7 +327,8 @@ void ASTVisitor::doVisitDeclRefExpr(const clang::DeclRefExpr *DeclRefExpr)
 OutputGenerator::OutputGenerator(std::shared_ptr<const Config> Config,
                                  clang::PrintingPolicy Policy,
                                  llvm::StringRef GeneratorName)
-    : ASTContext_(nullptr),
+    : ASTConsumer(),
+      ASTContext_(nullptr),
       Config_(std::move(Config)),
       Writer_(Policy),
       FunctionDecls_(),
@@ -422,7 +423,7 @@ void OutputGenerator::writeFileHeader()
     Writer_.write(Output);
     Writer_.write("\n");
 
-    Writer_.write(" */\n");
+    Writer_.write(" */\n\n");
 }
 
 void OutputGenerator::writeMacroDefinitions()

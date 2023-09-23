@@ -27,7 +27,9 @@ public:
     inline OutputWriter(clang::PrintingPolicy Policy);
 
     inline void indent(unsigned int N);
+    inline void writeDeclName(const clang::DeclContext *Context);
     inline void writeFullyQualifiedName(const clang::NamedDecl *Decl);
+    inline void writeFunctionDecl(const clang::FunctionDecl *Decl, unsigned int Indent = 0);
     void writeFunctionParameterList(const clang::FunctionDecl *Decl,
                                     bool ParameterNames = true,
                                     bool VarArgList = false);
@@ -61,9 +63,19 @@ inline void OutputWriter::indent(unsigned int N)
     Out_.indent(N);
 }
 
+inline void OutputWriter::writeDeclName(const clang::DeclContext *Context)
+{
+    Out_ << clang::cast<clang::NamedDecl>(Context)->getName();
+}
+
 inline void OutputWriter::writeFullyQualifiedName(const clang::NamedDecl *Decl)
 {
     Decl->printQualifiedName(Out_);
+}
+
+inline void OutputWriter::writeFunctionDecl(const clang::FunctionDecl *Decl, unsigned int Indent)
+{
+    Decl->print(Out_, PrintingPolicy_, Indent);
 }
 
 inline void OutputWriter::writeReturnType(const clang::FunctionDecl *Decl)

@@ -88,18 +88,17 @@ find_library(
 #
 add_executable(
     ${CMAKE_PROJECT_NAME}
-    src/output/OutputGenerator.cpp
-    src/output/OutputWriter.cpp
+    src/CompilationDatabase.cpp
+    src/Config.cpp
+    src/MockAction.cpp
+    src/main.cpp
     src/output/CMocka.cpp
     src/output/FFF.cpp
     src/output/GMock.cpp
-    src/MockAction.cpp
-    src/CompilationDatabase.cpp
+    src/output/Raw.cpp
+    src/output/OutputGenerator.cpp
+    src/output/OutputWriter.cpp
     src/util/Decl.cpp
-    src/Config.cpp
-    src/Generator.cpp
-    src/main.cpp
-    src/ASTVisitor.cpp
 )
 
 set_target_properties(

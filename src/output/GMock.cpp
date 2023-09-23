@@ -38,7 +38,8 @@ inline bool requiresPointerVariable(const clang::DeclContext *Context,
 } /* namespace */
 
 GMock::GMock(std::shared_ptr<const Config> Config, clang::PrintingPolicy Policy)
-    : OutputGenerator(std::move(Config), Policy, "gmock")
+    : OutputGenerator(std::move(Config), Policy, "gmock"),
+      ContextMap_()
 {
     /* There is not much choice here as the gmock library is written in C++ */
     getWriter().getPrintingPolicy().SuppressTagKeyword = true;
@@ -63,21 +64,7 @@ void GMock::run()
 
 void GMock::initializeContextMap()
 {
-    /* 
-     * Create a mapping of all declaration contexts to the child contexts
-     * used by the function declarations for which mocks need to be created.
-     */
-    for (const auto *Decl : getFunctionDecls()) {
-        const auto *Context = clang::cast<clang::DeclContext>(Decl);
-        const auto *Parent = Decl->getParent();
-
-        while (Parent) {
-            ContextMap_[Parent].insert(Context);
-
-            Context = Parent;
-            Parent = Parent->getParent();
-        }
-    }
+    ContextMap_ = createContextMap();
 }
 
 void GMock::writeIncludeDirectives()
@@ -111,7 +98,7 @@ void GMock::writeMockClass(const clang::DeclContext *Context, unsigned int Inden
         break;
     case clang::Decl::Namespace:
     case clang::Decl::CXXRecord:
-        Name = clang::dyn_cast<clang::NamedDecl>(Context)->getName();
+        Name = clang::cast<clang::NamedDecl>(Context)->getName();
 
         writeMockClass(Context, Name, Indent);
         break;
@@ -221,7 +208,7 @@ void GMock::writeFixtureSetUpFunction()
 {
     constexpr unsigned int Indent = 8;
 
-    getWriter().write("void SetUp() override {\n");
+    getWriter().write("    void SetUp() override {\n");
 
     /* 
      * Generate assignments from class variables to the respective pointer 

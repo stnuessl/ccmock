@@ -20,51 +20,60 @@
 
 #include <MockAction.hpp>
 
-#include "Generator.hpp"
-#include "CMocka.hpp"
-#include "FFF.hpp"
-#include "GMock.hpp"
+#include "output/OutputGenerator.hpp"
+#include "output/CMocka.hpp"
+#include "output/FFF.hpp"
+#include "output/GMock.hpp"
+#include "output/Raw.hpp"
 
-Generator::Generator(std::shared_ptr<const Config> Config,
-                     clang::PrintingPolicy Policy,
-                     llvm::StringRef Backend)
+OutputGenerator::OutputGenerator(std::shared_ptr<const Config> Config,
+                                 clang::PrintingPolicy Policy,
+                                 llvm::StringRef GeneratorName)
     : clang::ASTConsumer(),
+      ASTContext_(nullptr),
       Config_(std::move(Config)),
-      PrintingPolicy_(Policy),
-      Buffer_(),
-      Out_(Buffer_),
-      FuncDeclVec_(),
-      VarDeclVec_(),
-      AnyVariadic_(false),
-      Backend_(Backend)
+      Writer_(Policy),
+      FunctionDecls_(),
+      VarDecls_(),
+      Name_(GeneratorName),
+      AnyVariadic_(false)
 {
 }
 
-void Generator::HandleTranslationUnit(clang::ASTContext &Context)
+void OutputGenerator::HandleTranslationUnit(clang::ASTContext &Context)
 {
     (void) Context;
 }
 
 GMock::GMock(std::shared_ptr<const Config> Config, clang::PrintingPolicy Policy)
-    : Generator(std::move(Config), Policy, "GMock")
+    : OutputGenerator(std::move(Config), Policy, "GMock"),
+      ContextMap_()
 {
 }
 
 void GMock::run() {}
 
 CMocka::CMocka(std::shared_ptr<const Config> Config, clang::PrintingPolicy Policy)
-    : Generator(std::move(Config), Policy, "CMocka")
+    : OutputGenerator(std::move(Config), Policy, "CMocka")
 {
 }
 
 void CMocka::run() {}
 
 FFF::FFF(std::shared_ptr<const Config> Config, clang::PrintingPolicy Policy)
-    : Generator(std::move(Config), Policy, "FFF")
+    : OutputGenerator(std::move(Config), Policy, "FFF")
 {
 }
 
 void FFF::run() {}
+
+Raw::Raw(std::shared_ptr<const Config> Config, clang::PrintingPolicy Policy)
+    : OutputGenerator(std::move(Config), Policy, "Raw"),
+      CurrentAccess_(clang::AccessSpecifier::AS_none)
+{
+}
+
+void Raw::run() {}
 
 TEST(ActionFactory, Create)
 {

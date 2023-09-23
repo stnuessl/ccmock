@@ -34,12 +34,12 @@ public:
     void load(const std::filesystem::path &Path, std::string &Error);
     void detect(const std::filesystem::path &Path, std::string &Error);
 
-    virtual std::vector<clang::tooling::CompileCommand>
+    std::vector<clang::tooling::CompileCommand>
     getCompileCommands(llvm::StringRef File) const override;
 
-    virtual std::vector<std::string> getAllFiles() const override;
+    std::vector<std::string> getAllFiles() const override;
 
-    virtual std::vector<clang::tooling::CompileCommand>
+    std::vector<clang::tooling::CompileCommand>
     getAllCompileCommands() const override;
 
     inline operator bool() const noexcept;

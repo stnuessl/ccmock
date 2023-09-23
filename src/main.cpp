@@ -98,6 +98,11 @@ static llvm::cl::opt<Config::Backend> Backend(
             Config::BACKEND_CMOCKA,
             "cmocka",
             "Use the CMocka backend."
+        ),
+        clEnumValN(
+            Config::BACKEND_RAW,
+            "raw",
+            "Use the raw backend."
         )
     ),
     llvm::cl::value_desc("backend"),

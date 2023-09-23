@@ -54,12 +54,19 @@ protected:
     inline OutputWriter &getWriter();
     inline llvm::ArrayRef<const clang::FunctionDecl *> getFunctionDecls() const;
     inline llvm::ArrayRef<const clang::VarDecl *> getVarDecls() const;
-
     inline bool anyVariadic() const;
+
+    /* clang-format off */
+    inline llvm::DenseMap<
+        const clang::DeclContext *,
+        llvm::DenseSet<const clang::DeclContext *>
+    > createContextMap();
+    /* clang-format on */
 
     void writeFileHeader();
     void writeMacroDefinitions();
     void writeGlobalVariables();
+
 private:
     void write();
 
@@ -107,7 +114,8 @@ OutputGenerator::getFunctionDecls() const
     return llvm::ArrayRef(FunctionDecls_);
 }
 
-inline llvm::ArrayRef<const clang::VarDecl *> OutputGenerator::getVarDecls() const
+inline llvm::ArrayRef<const clang::VarDecl *>
+OutputGenerator::getVarDecls() const
 {
     return llvm::ArrayRef(VarDecls_);
 }
@@ -116,5 +124,38 @@ inline bool OutputGenerator::anyVariadic() const
 {
     return AnyVariadic_;
 }
+
+inline llvm::DenseMap<const clang::DeclContext *,
+                      llvm::DenseSet<const clang::DeclContext *>>
+OutputGenerator::createContextMap()
+{
+    auto Size = getFunctionDecls().size();
+
+    /* clang-format off */
+    auto Map = llvm::DenseMap<
+        const clang::DeclContext *,
+        llvm::DenseSet<const clang::DeclContext *>
+    >(Size);
+    /* clang-format on */
+
+    /*
+     * Create a mapping of all used declaration contexts to their respective
+     * child contexts.
+     */
+    for (const auto *Decl : getFunctionDecls()) {
+        const auto *Context = clang::cast<clang::DeclContext>(Decl);
+        const auto *Parent = Context->getParent();
+
+        while (Parent) {
+            Map[Parent].insert(Context);
+
+            Context = Parent;
+            Parent = Parent->getParent();
+        }
+    }
+
+    return Map;
+}
+
 
 #endif /* OUTPUTGENERATOR_HPP_ */

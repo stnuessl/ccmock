@@ -121,8 +121,8 @@ add_custom_command(
             --include ${CMAKE_SOURCE_DIR}/*
             --exclude ${CMAKE_CURRENT_SOURCE_DIR}/*
             --output-file ${UT_COVERAGE_INFO}
-            --rc lcov_branch_coverage=1
-            --rc lcov_function_coverage=1
+            --rc branch_coverage=1
+            --rc function_coverage=1
             ${LCOV_ARGS_CLANG}
     DEPENDS unit-tests
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
