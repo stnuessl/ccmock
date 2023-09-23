@@ -18,9 +18,9 @@
 #ifndef CMOCKA_HPP_
 #define CMOCKA_HPP_
 
-#include "Generator.hpp"
+#include "OutputGenerator.hpp"
 
-class CMocka : public Generator {
+class CMocka : public OutputGenerator {
 public:
     CMocka(std::shared_ptr<const Config> Config, clang::PrintingPolicy Policy);
 
@@ -31,6 +31,7 @@ private:
     void writeMockFunctions();
 
     void writeFunctionBody(const clang::FunctionDecl *Decl);
+    const Config::CMockaSection &getConfig() const;
 };
 
 #endif /* CMOCKA_HPP_ */

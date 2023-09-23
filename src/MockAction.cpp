@@ -1,16 +1,16 @@
 /*
  * Copyright (C) 2023  Steffen Nuessle
- * 
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
@@ -53,7 +53,7 @@ std::string DetectClangResourceDirectory()
     std::array<std::filesystem::path, 3> PathList = {
         "/usr/lib/clang",
         "/usr/lib64/clang",
-        "/lib/clang",    
+        "/lib/clang",
     };
 
     for (const auto &Item : PathList) {
@@ -79,6 +79,10 @@ MockAction::CreateASTConsumer(clang::CompilerInstance &CI, llvm::StringRef File)
 {
     (void) File;
 
+    /*
+     * As "PrintingPolicy" does not have a default constructor, this here is
+     * best place to create one. Having a separate policy
+     */
     auto Policy = clang::PrintingPolicy(CI.getLangOpts());
 
     switch (Config_->Mocking.Backend) {
@@ -89,7 +93,7 @@ MockAction::CreateASTConsumer(clang::CompilerInstance &CI, llvm::StringRef File)
     case Config::BACKEND_CMOCKA:
         return std::make_unique<CMocka>(Config_, Policy);
     default:
-        llvm_unreachable("invalid mocking backend");
+        llvm_unreachable("invalid output generator selected");
         break;
     }
 

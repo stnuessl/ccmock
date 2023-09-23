@@ -38,33 +38,17 @@ inline bool requiresPointerVariable(const clang::DeclContext *Context,
 } /* namespace */
 
 GMock::GMock(std::shared_ptr<const Config> Config, clang::PrintingPolicy Policy)
-    : Generator(std::move(Config), Policy, "gmock")
+    : OutputGenerator(std::move(Config), Policy, "gmock")
 {
     /* There is not much choice here as the gmock library is written in C++ */
-    PrintingPolicy_.SuppressTagKeyword = true;
-    PrintingPolicy_.Bool = true;
-    PrintingPolicy_.UseVoidForZeroParams = false;
+    getWriter().getPrintingPolicy().SuppressTagKeyword = true;
+    getWriter().getPrintingPolicy().Bool = true;
+    getWriter().getPrintingPolicy().UseVoidForZeroParams = false;
 }
 
 void GMock::run()
 {
-    // FIXME: clean up after major refactoring
-    std::vector<const clang::FunctionDecl *> Vec;
-
-    for (const auto &[_, DeclVec] : FuncDeclMap_)
-        Vec.insert(Vec.end(), DeclVec.begin(), DeclVec.end());
-
-    for (const auto *Decl : Vec) {
-        const auto *Context = clang::cast<clang::DeclContext>(Decl);
-        const auto *Parent = Decl->getParent();
-
-        while (Parent) {
-            ContextMap[Parent].insert(Context);
-
-            Context = Parent;
-            Parent = Parent->getParent();
-        }
-    }
+    initializeContextMap();
 
     writeIncludeDirectives();
     writeMacroDefinitions();
@@ -77,33 +61,44 @@ void GMock::run()
     writeMain();
 }
 
+void GMock::initializeContextMap()
+{
+    /* 
+     * Create a mapping of all declaration contexts to the child contexts
+     * used by the function declarations for which mocks need to be created.
+     */
+    for (const auto *Decl : getFunctionDecls()) {
+        const auto *Context = clang::cast<clang::DeclContext>(Decl);
+        const auto *Parent = Decl->getParent();
+
+        while (Parent) {
+            ContextMap_[Parent].insert(Context);
+
+            Context = Parent;
+            Parent = Parent->getParent();
+        }
+    }
+}
+
 void GMock::writeIncludeDirectives()
 {
 
-    if (AnyVariadic_) {
-        Out_ << R"(
-#include <cstdarg>
-)";
+    if (anyVariadic()) {
+        getWriter().write("\n"
+                          "#include <cstdarg>\n"
+                          "\n");
     }
 
-    Out_ << R"(
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
-)";
+
+    getWriter().write("\n"
+                      "#include <gmock/gmock.h>\n"
+                      "#include <gtest/gtest.h>\n"
+                      "\n");
 }
 
 void GMock::writeMockClass()
 {
-    const clang::TranslationUnitDecl *TUDecl = nullptr;
-
-    // FIXME: Cleanup after making astcontext available for the generators */
-    if (!ContextMap.empty()) {
-        const auto *Decl = clang::dyn_cast<clang::Decl>(ContextMap.begin()->first);
-        TUDecl = Decl->getASTContext().getTranslationUnitDecl();
-
-        writeMockClass(TUDecl);
-
-    }
+    writeMockClass(getASTContext().getTranslationUnitDecl());
 }
 
 void GMock::writeMockClass(const clang::DeclContext *Context, unsigned int Indent)
@@ -112,7 +107,7 @@ void GMock::writeMockClass(const clang::DeclContext *Context, unsigned int Inden
 
     switch (Context->getDeclKind()) {
     case clang::Decl::TranslationUnit:
-        writeMockClass(Context, Config_->GMock.ClassName, Indent);
+        writeMockClass(Context, getConfig().ClassName, Indent);
         break;
     case clang::Decl::Namespace:
     case clang::Decl::CXXRecord:
@@ -137,19 +132,23 @@ void GMock::writeMockClass(const clang::DeclContext *Context, unsigned int Inden
 void GMock::writeMockClass(const clang::DeclContext *Context, llvm::StringRef Name, unsigned int Indent)
 {
     bool IsGlobalContext = util::decl::isGlobalContext(Context);
-    const auto &Children = ContextMap[Context];
+    const auto &Children = ContextMap_[Context];
 
-    Out_.indent(Indent);
-    Out_ << "class";
+    getWriter().indent(Indent);
+    getWriter().write("class");
 
-    if (Context->isTranslationUnit())
-        Out_ << " " << Name;
-    else if (IsGlobalContext) 
-        Out_ << " " << Name << "_";
+    if (Context->isTranslationUnit()) {
+        getWriter().write(" ");
+        getWriter().write(Name);
+    } else if (IsGlobalContext) {
+        getWriter().write(" ");
+        getWriter().write(Name);
+        getWriter().write("_");
+    }
 
-    Out_ << " {\n";
-    Out_.indent(Indent);
-    Out_ << "public:\n";
+    getWriter().write(" {\n");
+    getWriter().indent(Indent);
+    getWriter().write("public:\n");
 
     for (const auto &Child : Children)
         writeMockClass(Child, Indent + 4);
@@ -157,28 +156,38 @@ void GMock::writeMockClass(const clang::DeclContext *Context, llvm::StringRef Na
     if (requiresPointerVariable(Context, Children)) 
         writeMockPointerInstance(Context, Indent + 4);
 
-    Out_.indent(Indent);
-    Out_ << "}";
+    getWriter().indent(Indent);
+    getWriter().write("}");
 
-    if (!IsGlobalContext)
-        Out_ << " " << Name;
+    if (!IsGlobalContext) {
+        getWriter().write(" ");
+        getWriter().write(Name);
+    }
 
-    Out_ << ";\n\n";
+    getWriter().write(";\n\n");
 }
 
 void GMock::writePointerDefinitions()
 {
-    for (const auto &[Context, Children] : ContextMap) {
+    /* 
+     * Example:
+     *      thread_local 
+     *      testing::StrictMock<DeclName> *DeclName::ccmock_ptr = nullptr;
+     */
+
+    for (const auto &[Context, Children] : ContextMap_) {
         if (!requiresPointerVariable(Context, Children))
             continue;
 
-        Out_ << "thread_local testing::" << Config_->GMock.MockType << "<";
+        getWriter().write("thread_local testing::");
+        getWriter().write(getConfig().MockType);
+        getWriter().write("<");
         writeQualifiedMockDeclarationName(Context);
-        Out_ << "> *";
+        getWriter().write("> *");
         writeQualifiedMockDeclarationName(Context);
-        Out_ << "::";
+        getWriter().write("::");
         writeConfigPointerName();
-        Out_ << " = nullptr;\n";
+        getWriter().write(" = nullptr;\n");
     }
 }
 
@@ -195,33 +204,31 @@ void GMock::writeFixture()
      *          testing::StrictMock<ccmock::mock_> mock;
      *      };
      */
-
-    Out_ << "\n"
-            "class " 
-         << Config_->GMock.TestFixtureName << " : public testing::Test {\n"
-            "protected:\n";
-
+    getWriter().write("\n"
+                 "class ");
+    getWriter().write(getConfig().TestFixtureName);
+    getWriter().write(" : public testing::Test {\n"
+                 "protected:\n");
     writeFixtureSetUpFunction();
-    Out_ << "\n";
+    getWriter().write("\n");
     writeFixtureVariables();
 
     /* Close class declaration */
-    Out_ << "};\n";
-
-    Out_ << "\n";
+    getWriter().write("};\n\n");
 }
     
 void GMock::writeFixtureSetUpFunction()
 {
     constexpr unsigned int Indent = 8;
 
-    Out_ << "void SetUp() override {\n";
+    getWriter().write("void SetUp() override {\n");
 
     /* 
      * Generate assignments from class variables to the respective pointer 
      * variables.
      */
-    for (const auto &[Context, Children] : ContextMap) {
+
+    for (const auto &[Context, Children] : ContextMap_) {
         /*
          * Keys in 'ContextMap' can only be 'TranslationUnitDecls', 
          * 'NamespaceDecls' and 'CXXRecordDecls' but only the latter two
@@ -232,45 +239,46 @@ void GMock::writeFixtureSetUpFunction()
             continue;
 
         writeMockPointerAccess(Context, Indent);
-        
-        Out_ << " = &";
+    
+        getWriter().write(" = &");
         writeFixtureVariableAccess(Context);
-        Out_ << ";\n";
+        getWriter().write(";\n");
     }
 
-    Out_ << "    }\n";
+    getWriter().write("    }\n");
 }
     
 void GMock::writeFixtureVariables()
 {
     constexpr unsigned int Indent = 4;
 
-    for (const auto &[Context, Children] : ContextMap) {
+    for (const auto &[Context, Children] : ContextMap_) {
         if (!requiresPointerVariable(Context, Children))
             continue;
 
-        Out_.indent(Indent);
-        Out_ << "testing::" << Config_->GMock.MockType << "<";
-
+        getWriter().indent(Indent);
+        getWriter().write("testing::");
+        getWriter().write(getConfig().MockType);
+        getWriter().write("<");
         writeQualifiedMockDeclarationName(Context);
-        Out_ << "> ";
+        getWriter().write("> ");
 
         if (Context->isTranslationUnit())
-            Out_ << "_";
+            getWriter().write("_");
         else
-            Out_ << clang::dyn_cast<clang::NamedDecl>(Context)->getName();
+            getWriter().write(clang::cast<clang::NamedDecl>(Context)->getName());
 
-        Out_ << ";\n";
+        getWriter().write(";\n");
     }
 }
 
 void GMock::writeFixtureVariableAccess(const clang::DeclContext *Context)
 {
-    Out_ << "(*this)";
+    getWriter().write("(*this)");
 
     if (Context->isTranslationUnit()) {
-        Out_ << ".";
-        writeConfigGlobalNamespaceName();
+        getWriter().write(".");
+        getWriter().write(getConfig().GlobalNamespaceName);
         return;
     }
 
@@ -283,9 +291,10 @@ void GMock::writeFixtureVariableAccess(const clang::DeclContext *Context)
     Vec.pop_back();
 
     for (const auto *Context : llvm::reverse(Vec)) {
-        const auto *Decl = clang::dyn_cast<clang::NamedDecl>(Context);
+        const auto *Decl = clang::cast<clang::NamedDecl>(Context);
         
-        Out_ << "." << Decl->getName();
+        getWriter().write(".");
+        getWriter().write(Decl->getName());
     }
 }
 
@@ -293,29 +302,21 @@ void GMock::writeFixtureVariableAccess(const clang::DeclContext *Context)
 
 void GMock::writeMockFunctions()
 {
-    for (auto &[ContextDecl, FuncDeclVec] : FuncDeclMap_) {
-        (void) ContextDecl;
-
-        for (const auto *Decl : FuncDeclVec)
-            writeFunction(Decl);
-    }
+    for (const auto &Decl : getFunctionDecls())
+        writeFunction(Decl);
 }
 
 void GMock::writeMain()
 {
-    if (!Config_->GMock.WriteMain)
+    if (!getConfig().WriteMain)
         return;
 
-    /* clang-format off */
-    Out_ <<
-R"(int main(int argc, char *argv[])
-{
-    testing::InitGoogleTest(&argc, argv);
-
-    return RUN_ALL_TESTS();
-}
-)";
-    /* clang-format on */
+    getWriter().write("int main(int argc, char *argv[])\n"
+                      "{\n"
+                      "    testing::InitGoogleTest(&argc, argv);\n"
+                      "\n"
+                      "    return RUN_ALL_TESTS();\n"
+                      "}\n\n");
 }
 
 
@@ -323,35 +324,45 @@ void GMock::writeMockMethod(const clang::DeclContext *Context, unsigned int Inde
 {
     const auto *Decl = clang::cast<clang::FunctionDecl>(Context);
 
-    Out_.indent(Indent);
-    Out_ << "MOCK_METHOD((";
+    getWriter().indent(Indent);
+    getWriter().write("MOCK_METHOD((");
 
     if (util::decl::hasReturnType(Decl))
-        writeReturnType(Decl);
+        getWriter().writeReturnType(Decl);
     else
-        Out_ << "void";
+        getWriter().write("void");
 
-    auto Name = Generator::getMockName(Decl);
-
-    Out_ << "), " << Name << ", ";
-    writeFunctionParameterList(Decl, /* ParameterNames */ false, /* VarArgList */ true);
-    Out_ << ");\n";
+    getWriter().write("), ");
+    getWriter().writeMockName(Decl);
+    getWriter().write(", ");
+    getWriter().writeFunctionParameterList(Decl,
+                                           /* ParameterNames */ false,
+                                           /* VarArgList */ true);
+    getWriter().write(");\n");
 }
     
 void GMock::writeMockPointerInstance(const clang::DeclContext *Context, unsigned int Indent)
 {
-    Out_.indent(Indent);
-    Out_ << "static thread_local testing::" 
-         << Config_->GMock.MockType << "<";
+    /* 
+     * Example:
+     *      static thread_local 
+     *      testing::StrictMock<ConfigClassName> *ccmock_ptr;
+     */
+    getWriter().indent(Indent);
+    getWriter().write("static thread_local testing::");
+    getWriter().write(getConfig().MockType);
+    getWriter().write("<");
 
-    if (Context->isTranslationUnit())
-        writeConfigClassName();
-    else
-        Out_ << clang::cast<clang::NamedDecl>(Context)->getName() << "_";
+    if (Context->isTranslationUnit()) {
+        getWriter().write(getConfig().ClassName);
+    } else {
+        getWriter().write(clang::cast<clang::NamedDecl>(Context)->getName());
+        getWriter().write("_");
+    }
 
-    Out_ << "> *";
+    getWriter().write("> *");
     writeConfigPointerName();
-    Out_ << ";\n";
+    getWriter().write(";\n");
 }
 
 void GMock::writeMockPointerAccess(const clang::DeclContext *Context, unsigned int Indent)
@@ -364,16 +375,19 @@ void GMock::writeMockPointerAccess(const clang::DeclContext *Context, unsigned i
     /* We don't need the 'TranslationUnitDecl' */
     Vec.pop_back();
 
-    Out_.indent(Indent);
-    writeConfigClassName();
+    getWriter().indent(Indent);
+    getWriter().write(getConfig().ClassName);
 
     for (const auto *Item : llvm::reverse(Vec)) {
-        const auto *Decl = clang::dyn_cast<clang::NamedDecl>(Item);
+        const auto *Decl = clang::cast<clang::NamedDecl>(Item);
 
-        Out_ << "::" << Decl->getName() << "_";
+        /* FIXME: duplicate code */
+        getWriter().write("::");
+        getWriter().write(Decl->getName());
+        getWriter().write("_");
     }
 
-    Out_ << "::";
+    getWriter().write("::");
     writeConfigPointerName();
 }
 
@@ -387,76 +401,89 @@ void GMock::writeQualifiedMockDeclarationName(const clang::DeclContext *Context)
     /* We don't need the 'TranslationUnitDecl' */
     Vec.pop_back();
 
-    writeConfigClassName();
+    getWriter().write(getConfig().ClassName);
 
     for (const auto *Item : llvm::reverse(Vec)) {
         const auto *Decl = clang::cast<clang::NamedDecl>(Item);
 
-        Out_ << "::" << Decl->getName() << "_";
+        /* FIXME: duplicate code */
+        getWriter().write("::");
+        getWriter().write(Decl->getName());
+        getWriter().write("_");
     }
 }
 
 void GMock::writeFunction(const clang::FunctionDecl *Decl)
 {
     if (Decl->isExternC())
-        Out_ << "CCMOCK_DECL ";
+        getWriter().write("CCMOCK_LINKAGE ");
 
     if (util::decl::hasReturnType(Decl)) {
-        writeReturnType(Decl);
-        Out_ << "\n";
+        getWriter().writeReturnType(Decl);
+        getWriter().write("\n");
     }
 
-    writeQualifiedName(Decl);
-    writeFunctionParameterList(Decl);
+    getWriter().writeFullyQualifiedName(Decl);
+    getWriter().writeFunctionParameterList(Decl);
     writeFunctionSpecifiers(Decl);
     writeFunctionReferenceQualifiers(Decl);
-    Out_ << "\n";
+    getWriter().write("\n");
     writeFunctionBody(Decl);
-    Out_ << "\n";
+    getWriter().write("\n");
 }
 
 void GMock::writeMockCall(const clang::FunctionDecl *Decl)
 {
     writeMockCallPointerAccess(Decl);
 
-    Out_ << Generator::getMockName(Decl) << "(";
+    getWriter().writeMockName(Decl);
+    getWriter().write("(");
 
     /* Write out required function arguments. */
     auto Parameters = Decl->parameters();
 
     for (unsigned int i = 0, Size = Parameters.size(); i < Size; ++i) {
         if (i != 0)
-            Out_ << ", ";
+            getWriter().write(", ");
 
         bool useMove = Parameters[i]->getType()->isRValueReferenceType();
 
         if (useMove)
-            Out_ << "std::move(";
+            getWriter().write("std::move(");
 
-        if (!Parameters[i]->getName().empty())
-            Out_ << *Parameters[i];
-        else
-            Out_ << "arg" << i + 1;
+        if (!Parameters[i]->getName().empty()) {
+            getWriter().write(Parameters[i]->getName());
+        } else {
+            getWriter().write("arg");
+            getWriter().write(i + 1);
+        }
 
         if (useMove)
-            Out_ << ")";
+            getWriter().write(")");
     }
 
     if (Decl->isVariadic())
-        Out_ << ", vargs_";
+        getWriter().write(", vargs_");
 
-    Out_ << ");\n";
+    getWriter().write(");\n");
 }
     
 void GMock::writeMockCallPointerAccess(const clang::FunctionDecl *Decl)
 {
-    Out_ << "(*";
-    writeConfigClassName();
+    /*
+     * Example for translation unit:
+     *      (*ccmock_::ccmock_ptr).
+     * Examples for namespaces and classes:
+     *      (*ccmock_::Namespace_::Class::ccmock_ptr).
+     *      (*ccmock_::Class1_::Class2::ccmock_ptr).
+     */
+    getWriter().write("(*");
+    getWriter().write(getConfig().ClassName);
 
     if (Decl->getParent()->isTranslationUnit()) {
-        Out_ << "::";
+        getWriter().write("::");
         writeConfigPointerName();
-        Out_ << ").";
+        getWriter().write(").");
 
         return;
     } 
@@ -470,21 +497,25 @@ void GMock::writeMockCallPointerAccess(const clang::FunctionDecl *Decl)
     Vec.pop_back();
  
     for (const auto *Item : llvm::reverse(Vec)) {
-        const auto *Decl = clang::dyn_cast<clang::NamedDecl>(Item);
+        const auto *Decl = clang::cast<clang::NamedDecl>(Item);
         const auto Name = Decl->getName();
 
         if (util::decl::isGlobalContext(Item)) {
-            Out_ << "::" << Name << "_::";
+            getWriter().write("::");
+            getWriter().write(Name);
+            getWriter().write("_::");
+
             writeConfigPointerName();
-            Out_ << ")";
+            getWriter().write(")");
 
             continue;
         }
 
-        Out_ << "." << Name;
+        getWriter().write(".");
+        getWriter().write(Name);
     }
 
-    Out_ << ".";
+    getWriter().write(".");
 }
 
 void GMock::writeFunctionBody(const clang::FunctionDecl *Decl)
@@ -496,15 +527,14 @@ void GMock::writeFunctionBody(const clang::FunctionDecl *Decl)
      *  }
      */
     if (!Decl->isVariadic()) {
-        Out_ << "{\n"
-             << "    ";
-
+        getWriter().write("{\n"
+                          "    ");
         if (!Decl->getReturnType()->isVoidType())
-            Out_ << "return ";
+            getWriter().write("return ");
 
         writeMockCall(Decl);
 
-        Out_ << "}\n";
+        getWriter().write("}\n");
 
         return;
     }
@@ -520,39 +550,43 @@ void GMock::writeFunctionBody(const clang::FunctionDecl *Decl)
      *      return value_;
      *  }
      */
-    Out_ << "{\n"
-            "    va_list vargs_;\n"
-            "\n"
-            "    va_start(vargs_, ";
+    getWriter().write("{\n"
+              "    va_list vargs_;\n"
+              "\n"
+              "    va_start(vargs_, ");
 
     auto Parameters = Decl->parameters();
 
-    auto *ParmVarDecl = Parameters.back();
+    const auto *ParmVarDecl = Parameters.back();
+
     if (!ParmVarDecl->getName().empty())
-        Out_ << *ParmVarDecl;
-    else
-        Out_ << "arg" << Parameters.size();
+        getWriter().write(ParmVarDecl->getName());
+    else {
+        getWriter().write("arg");
+        getWriter().write(Parameters.size());
+    }
 
-    Out_ << ");\n"
-         << "    ";
-
+    getWriter().write(");\n"
+                      "    ");
     if (!Decl->getReturnType()->isVoidType())
-        Out_ << "auto mock_val = ";
+        getWriter().write("auto ccmock_val_ = ");
 
     writeMockCall(Decl);
 
-    Out_ << "    va_end(vargs_);\n";
+    getWriter().write("    va_end(vargs_);\n");
 
     if (!Decl->getReturnType()->isVoidType()) {
-        Out_ << "\n"
-                "    return mock_val;\n";
+        getWriter().write("\n"
+                          "    return ccmock_val_;\n");
     }
 
-    Out_ << "}\n";
+    /* Close the function body */
+    getWriter().write("}\n");
 }
 
 void GMock::writeFunctionSpecifiers(const clang::FunctionDecl *Decl)
 {
+    /* FIXME: move to OutputWriter */
     const auto *MethodDecl = clang::dyn_cast<clang::CXXMethodDecl>(Decl);
     if (!MethodDecl)
         return;
@@ -561,7 +595,7 @@ void GMock::writeFunctionSpecifiers(const clang::FunctionDecl *Decl)
     const auto *FuncProtoType = QualType->castAs<clang::FunctionProtoType>();
 
     if (FuncProtoType->isConst())
-        Out_ << " const";
+        getWriter().write(" const");
 
     /* 
      * Seems like destructors can get the noexcept attribute attached 
@@ -570,21 +604,22 @@ void GMock::writeFunctionSpecifiers(const clang::FunctionDecl *Decl)
      */
     bool IsNoexcept = FuncProtoType->hasNoexceptExceptionSpec();
     if (IsNoexcept && Decl->getExceptionSpecSourceRange().isValid())
-        Out_ << " noexcept";
+        getWriter().write(" noexcept");
 }
 
 void GMock::writeFunctionReferenceQualifiers(const clang::FunctionDecl *Decl)
 {
+    /* FIXME: move to OutputWriter */
     const auto *MethodDecl = clang::dyn_cast<clang::CXXMethodDecl>(Decl);
     if (!MethodDecl)
         return;
 
     switch (MethodDecl->getRefQualifier()) {
     case clang::RefQualifierKind::RQ_LValue:
-        Out_ << " &";
+        getWriter().write(" &");
         break;
     case clang::RefQualifierKind::RQ_RValue:
-        Out_ << " &&";
+        getWriter().write(" &&");
         break;
     case clang::RefQualifierKind::RQ_None:
     default:
@@ -594,23 +629,14 @@ void GMock::writeFunctionReferenceQualifiers(const clang::FunctionDecl *Decl)
 
 const Config::GMockSection &GMock::getConfig() const
 {
-    return Config_->GMock;
-}
-
-void GMock::writeConfigClassName()
-{
-    Out_ << getConfig().ClassName;
+    return OutputGenerator::getConfig().GMock;
 }
 
 void GMock::writeConfigPointerName()
 {
     llvm::StringRef Name = getConfig().ClassName;
 
-    Out_ << Name.rtrim('_')  << "_ptr_";
-}
-
-void GMock::writeConfigGlobalNamespaceName()
-{
-    Out_ << getConfig().GlobalNamespaceName;
+    getWriter().write(Name.rtrim('_'));
+    getWriter().write("_ptr_");
 }
 

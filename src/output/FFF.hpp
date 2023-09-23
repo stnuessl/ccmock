@@ -18,9 +18,9 @@
 #ifndef FFF_HPP_
 #define FFF_HPP_
 
-#include "Generator.hpp"
+#include "OutputGenerator.hpp"
 
-class FFF : public Generator {
+class FFF : public OutputGenerator {
 public:
     FFF(std::shared_ptr<const Config> Config, clang::PrintingPolicy Policy);
 
@@ -33,7 +33,11 @@ private:
     void writeTypedefs();
     void writeMocks();
 
+    const Config::FFFSection &getConfig() const;
+
     llvm::DenseMap<const clang::Type *, const clang::VarDecl *> TypedefMap_;
 };
+
+
 
 #endif /* FFF_HPP_ */
