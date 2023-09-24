@@ -303,7 +303,7 @@ public:
     explicit RemoveArgumentsAdjuster(std::vector<std::string> &&RemoveArgs)
         : RemoveArgs_(RemoveArgs.size())
     {
-        for (auto &Arg : RemoveArgs)
+        for (auto &&Arg : RemoveArgs)
             RemoveArgs_.insert({std::move(Arg), 0});
     }
 
@@ -316,7 +316,7 @@ public:
         auto AdjustedArgs = clang::tooling::CommandLineArguments();
         AdjustedArgs.reserve(Args.size() - RemoveArgs_.size());
 
-        for (auto &Arg : Args) {
+        for (const auto &Arg : Args) {
             if (!RemoveArgs_.count(Arg))
                 AdjustedArgs.push_back(Arg);
         }
@@ -479,7 +479,7 @@ __attribute__((used)) static int ccmock_main(int argc, const char *argv[])
     Factory.setConfig(Config);
 
     /* Perform the ClangTool invocation */
-    auto &Input = Config->General.Input.native();
+    const auto &Input = Config->General.Input.native();
     auto Tool = clang::tooling::ClangTool(Commands, Input);
 
     auto &ExtraArgs = Config->Clang.ExtraArguments;

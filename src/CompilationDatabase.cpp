@@ -25,7 +25,7 @@ void CompilationDatabase::load(const std::filesystem::path &Path,
 {
     using namespace clang::tooling;
 
-    auto &Item = Path.native();
+    const auto &Item = Path.native();
     auto Ext = llvm::sys::path::extension(Item);
     if (Ext.equals(".json")) {
         auto Value = JSONCommandLineSyntax::AutoDetect;

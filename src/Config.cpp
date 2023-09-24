@@ -25,14 +25,18 @@ namespace yaml {
 template <> struct ScalarTraits<std::filesystem::path> {
 public:
     static void
-    output(const std::filesystem::path &Value, void *, llvm::raw_ostream &Out)
+    output(const std::filesystem::path &Value, void *Unused, llvm::raw_ostream &Out)
     {
+        (void) Unused;
+
         Out << Value.native();
     }
 
     static llvm::StringRef
-    input(llvm::StringRef Scalar, void *, std::filesystem::path &Value)
+    input(llvm::StringRef Scalar, void *Unused, std::filesystem::path &Value)
     {
+        (void) Unused;
+
         Value = Scalar.str();
 
         return llvm::StringRef();

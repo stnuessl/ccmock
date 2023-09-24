@@ -16,10 +16,12 @@
 # 
 
 include(cmake/clang-analysis.cmake)
+include(cmake/clang-tidy.cmake)
 include(cmake/cppcheck.cmake)
 include(cmake/shellcheck.cmake)
 
 find_program(CLANG clang ${CCMOCK_REQUIRE_DEPS})
+find_program(CLANG_TIDY clang-tidy ${CCMOCK_REQUIRE_DEPS})
 find_program(CLANG_EXTDEF_MAPPING clang-extdef-mapping ${CCMOCK_REQUIRE_DEPS})
 find_program(CPPCHECK cppcheck ${CCMOCK_REQUIRE_DEPS})
 find_program(SHELLCHECK shellcheck ${CCMOCK_REQUIRE_DEPS})
@@ -45,6 +47,24 @@ if (CLANG AND CLANG_EXTDEF_MAPPING)
     add_dependencies(tarball clang-analysis)
     append(TARBALL_FILES ${CLANG_ANALYSIS_DIRECTORY})
 
+endif()
+
+#
+# clang-tidy
+#
+if (CLANG_TIDY)
+    set(CLANG_TIDY_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/clang-tidy)
+
+    add_clang_tidy(
+        TARGET ${CMAKE_PROJECT_NAME}
+        COMPILATION_DATABASE ${COMPILATION_DATABASE}
+        OUTPUT_DIRECTORY ${CLANG_TIDY_DIRECTORY}
+        OUTPUT_FILES CLANG_TIDY_OUTPUT
+    )
+
+    add_custom_target(clang-tidy DEPENDS ${CLANG_TIDY_OUTPUT})
+    add_dependencies(tarball clang-tidy)
+    append(TARBALL_FILES ${CLANG_TIDY_DIRECTORY})
 endif()
 
 #

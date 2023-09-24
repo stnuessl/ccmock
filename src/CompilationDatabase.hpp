@@ -15,8 +15,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef COMPILATION_DATABASE_HPP
-#define COMPILATION_DATABASE_HPP
+#ifndef COMPILATION_DATABASE_HPP_
+#define COMPILATION_DATABASE_HPP_
 
 #include <filesystem>
 #include <memory>
@@ -61,4 +61,4 @@ inline CompilationDatabase::operator bool() const noexcept
     return Database_ != nullptr;
 }
 
-#endif /* COMPILATION_DATABASE_HPP */
+#endif /* COMPILATION_DATABASE_HPP_ */

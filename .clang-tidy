@@ -1,0 +1,14 @@
+---
+Checks: >-
+  -*,
+  bugprone-*,
+  cert-*,
+  cppcoreguidelines-*,
+  performance-*,
+  readability-*,
+  -readability-braces-around-statements,
+  -readability-identifier-length,
+  -readability-implicit-bool-conversion,
+  -readability-redundant-member-init
+HeaderFilterRegex: '.*'
+...
