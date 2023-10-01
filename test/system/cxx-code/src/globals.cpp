@@ -28,17 +28,37 @@ private:
 
 namespace n1 {
 
+class c2 {
+public:
+    c2() noexcept;
+    c2(const c2 &other) = default;
+    c2(c2 &&other) = default;
+
+    virtual ~c2() noexcept;
+
+    c2 &operator=(const c2 &other) = default;
+    c2 &operator=(c2 &&other) = default;
+
+
+    void run();
+};
+
 extern int i1;
+extern void (*f1)(int arg1, int arg2);
 
 namespace n2 {
 
 extern class c1 c1;
+extern class c2 c2;
 
 } /* namespace n2 */
 } /* namespace n1 */
 
 void run()
-{
+{   
+    n1::f1(0, 1);
+
     n1::n2::c1.set(n1::i1);
     n1::n2::c1.run();
+    n1::n2::c2.run();
 }

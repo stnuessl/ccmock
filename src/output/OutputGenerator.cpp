@@ -291,11 +291,31 @@ void ASTVisitor::doVisitDeclRefExpr(const clang::DeclRefExpr *DeclRefExpr)
     if (!Decl)
         return;
 
+//    if (!Decl->hasGlobalStorage())
+//        return;
+//
+    if (!Decl->isExternallyVisible())
+        return;
+
+
     if (!SourceManager_->isInMainFile(DeclRefExpr->getExprLoc()))
         return;
 
-    if (Decl->getDefinition())
-        return;
+//    if (Decl->getDefinition())
+//        return;
+
+    if (const auto *CXXRecordDecl = Decl->getType()->getAsCXXRecordDecl()) {
+        /* 
+         * On encountering an external declared object we might have to add 
+         * its constructor to the list of functions that need to be mocked.
+         */
+        for (const auto *Decl : CXXRecordDecl->ctors()) {
+            if (Decl->isDefaultConstructor() && !Decl->isDefined()) {
+                dispatch(DeclRefExpr, Decl);
+                dispatch(DeclRefExpr, CXXRecordDecl->getDestructor());
+            }
+        }
+    }
 
     Buffer_.clear();
     Decl->printQualifiedName(OS);
@@ -438,7 +458,11 @@ void OutputGenerator::writeMacroDefinitions()
 
 void OutputGenerator::writeGlobalVariables()
 {
-    /* FIXME: make this disablable with a config value */
+    bool SavedValue = Writer_.getPrintingPolicy().SuppressTagKeyword;
+
+    Writer_.getPrintingPolicy().SuppressTagKeyword = false;
+
+    /* FIXME: make this disableable with a config value */
     for (const auto *Decl : getVarDecls()) {
         auto Type = Decl->getType();
 
@@ -446,26 +470,36 @@ void OutputGenerator::writeGlobalVariables()
          * These variable declarations here will all be declared with
          * "extern" so we have to remove it. Also some might have
          * gcc attributes assigned to them which also need to be removed.
-         * To make this work with function pointer definitions, it is
-         * the easiest to create a new VarDecl and let clang to the printing.
          */
         auto Pointee = Type->getPointeeType();
-        if (Pointee.isNull() || !Pointee->isFunctionType()) {
-            Writer_.writeType(Type);
-            Writer_.write(" ");
-            Writer_.write(Decl->getName());
+        if (!Pointee.isNull() && Pointee->isFunctionType()) {
+            constexpr size_t Size = 64;
+            llvm::SmallString<Size> Buffer;
+            llvm::raw_svector_ostream OS(Buffer);
+
+            Decl->printQualifiedName(OS, Writer_.getPrintingPolicy());
+
+            Writer_.writeType(Type, Buffer.str());
             Writer_.write(";\n");
+
             continue;
         }
 
-        auto &Context = Decl->getASTContext();
-        auto *VarDecl = util::decl::fakeVarDecl(Context, Type, Decl->getName());
-        Writer_.writeType(VarDecl);
+        if (const auto *CXXRecordDecl = Type->getAsCXXRecordDecl()) {
+            if (!CXXRecordDecl->hasDefaultConstructor())
+                continue;
+        }
+
+        Writer_.writeType(Type);
+        Writer_.write(" ");
+        Writer_.writeFullyQualifiedName(Decl);
         Writer_.write(";\n");
     }
 
     if (!getVarDecls().empty())
         Writer_.write("\n");
+    
+    Writer_.getPrintingPolicy().SuppressTagKeyword = SavedValue;
 }
 
 void OutputGenerator::write()

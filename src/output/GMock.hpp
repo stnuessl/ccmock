@@ -44,6 +44,7 @@ private:
 
     void writeFixture();
     void writeFixtureSetUpFunction();
+    void writeFixtureTearDownFunction();
     void writeFixtureVariables();
     void writeFixtureVariableAccess(const clang::DeclContext *Context);
 
@@ -63,8 +64,6 @@ private:
     void writeMockCall(const clang::FunctionDecl *Decl);
     void writeMockCallPointerAccess(const clang::FunctionDecl *Decl);
     void writeFunctionBody(const clang::FunctionDecl *Decl);
-    void writeFunctionSpecifiers(const clang::FunctionDecl *Decl);
-    void writeFunctionReferenceQualifiers(const clang::FunctionDecl *Decl);
 
     const Config::GMockSection &getConfig() const;
     void writeConfigPointerName();

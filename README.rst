@@ -235,6 +235,16 @@ Examples
 Explore the `test/system <test/system>`_ directory to see how ccmock can be
 integrated into a build system for automatic mock generation.
 
+Implementation Details
+======================
+
+* C++
+  * Mock function calls are not associated to any specific object instance.
+  * The constructors and destructors of global objects cannot be checked with
+    mock calls.
+  * Global objects can only be automatically instantiated if they have a 
+    default constructor.
+
 Open Points
 ===========
 

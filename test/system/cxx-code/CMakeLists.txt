@@ -38,7 +38,7 @@ set(
     clone1.cpp
     clone2.cpp
     diffdecls.cpp
-    #global.cpp
+    globals.cpp
 )
 
 foreach(CCMOCK_BACKEND ${CCMOCK_BACKENDS})

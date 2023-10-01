@@ -104,6 +104,48 @@ void OutputWriter::writeFunctionParameterList(const clang::FunctionDecl *Decl,
     Out_ << ")";
 }
 
+void OutputWriter::writeFunctionSpecifiers(const clang::FunctionDecl *Decl)
+{
+    const auto *MethodDecl = clang::dyn_cast<clang::CXXMethodDecl>(Decl);
+    if (!MethodDecl)
+        return;
+
+    auto QualType = MethodDecl->getType();
+    const auto *FuncProtoType = QualType->castAs<clang::FunctionProtoType>();
+
+    if (FuncProtoType->isConst())
+        write(" const");
+
+    /*
+     * Seems like destructors can get the noexcept attribute attached
+     * automatically which can cause a warning if we manually attach it
+     * to the definition.
+     */
+    bool IsNoexcept = FuncProtoType->hasNoexceptExceptionSpec();
+    if (IsNoexcept && Decl->getExceptionSpecSourceRange().isValid())
+        write(" noexcept");
+}
+
+void OutputWriter::writeFunctionReferenceQualifiers(
+    const clang::FunctionDecl *Decl)
+{
+    const auto *MethodDecl = clang::dyn_cast<clang::CXXMethodDecl>(Decl);
+    if (!MethodDecl)
+        return;
+
+    switch (MethodDecl->getRefQualifier()) {
+    case clang::RefQualifierKind::RQ_LValue:
+        write(" &");
+        break;
+    case clang::RefQualifierKind::RQ_RValue:
+        write(" &&");
+        break;
+    case clang::RefQualifierKind::RQ_None:
+    default:
+        break;
+    }
+}
+
 void OutputWriter::writeMockName(const clang::FunctionDecl *Decl)
 {
     switch (Decl->getKind()) {
@@ -120,7 +162,7 @@ void OutputWriter::writeMockName(const clang::FunctionDecl *Decl)
         break;
     }
 
-    switch (Decl->getOverloadedOperator())  {
+    switch (Decl->getOverloadedOperator()) {
     case clang::OO_None:
         Out_ << Decl->getName();
         break;
@@ -258,3 +300,4 @@ void OutputWriter::writeMockName(const clang::FunctionDecl *Decl)
         break;
     }
 }
+

@@ -29,35 +29,42 @@ public:
     inline void indent(unsigned int N);
     inline void writeDeclName(const clang::DeclContext *Context);
     inline void writeFullyQualifiedName(const clang::NamedDecl *Decl);
-    inline void writeFunctionDecl(const clang::FunctionDecl *Decl, unsigned int Indent = 0);
+    inline void writeFunctionDecl(const clang::FunctionDecl *Decl,
+                                  unsigned int Indent = 0);
     void writeFunctionParameterList(const clang::FunctionDecl *Decl,
                                     bool ParameterNames = true,
                                     bool VarArgList = false);
+    void writeFunctionSpecifiers(const clang::FunctionDecl *Decl);
+    void writeFunctionReferenceQualifiers(const clang::FunctionDecl *Decl);
     void writeMockName(const clang::FunctionDecl *Decl);
-    inline void writeReturnType(const clang::FunctionDecl *Decl);
-    inline void writeType(const clang::VarDecl *Decl);
-    inline void writeType(clang::QualType Type);
-    inline void writeVarDecl(const clang::VarDecl *Decl);
-    
-    template <typename T>
-    void write(T Data);
+    inline void writeReturnType(const clang::FunctionDecl *Decl,
+                                llvm::Twine Twine = llvm::Twine());
+    inline void writeType(const clang::VarDecl *Decli,
+                          llvm::Twine Twine = llvm::Twine());
+    inline void writeType(clang::QualType Type,
+                          llvm::Twine Twine = llvm::Twine());
+    inline void writeVarDecl(const clang::VarDecl *Decl,
+                             bool PrintInstantiation = false);
+
+    template <typename T> void write(T Data);
 
     inline void flush(llvm::raw_ostream &OS);
 
     inline clang::PrintingPolicy &getPrintingPolicy();
     const inline clang::PrintingPolicy &getPrintingPolicy() const;
+
 private:
     clang::PrintingPolicy PrintingPolicy_;
     std::string Buffer_;
     llvm::raw_string_ostream Out_;
 };
 
-OutputWriter::OutputWriter(clang::PrintingPolicy Policy) 
+OutputWriter::OutputWriter(clang::PrintingPolicy Policy)
     : PrintingPolicy_(Policy), Buffer_(), Out_(Buffer_)
 {
     Buffer_.reserve(BUFSIZ);
 }
-    
+
 inline void OutputWriter::indent(unsigned int N)
 {
     Out_.indent(N);
@@ -73,35 +80,38 @@ inline void OutputWriter::writeFullyQualifiedName(const clang::NamedDecl *Decl)
     Decl->printQualifiedName(Out_);
 }
 
-inline void OutputWriter::writeFunctionDecl(const clang::FunctionDecl *Decl, unsigned int Indent)
+inline void OutputWriter::writeFunctionDecl(const clang::FunctionDecl *Decl,
+                                            unsigned int Indent)
 {
     Decl->print(Out_, PrintingPolicy_, Indent);
 }
 
-inline void OutputWriter::writeReturnType(const clang::FunctionDecl *Decl)
+inline void OutputWriter::writeReturnType(const clang::FunctionDecl *Decl,
+                                          llvm::Twine Twine)
 {
     auto Type = Decl->getReturnType();
 
-    writeType(Type);
+    writeType(Type, Twine);
 }
 
-inline void OutputWriter::writeType(const clang::VarDecl *Decl)
+inline void OutputWriter::writeType(const clang::VarDecl *Decl,
+                                    llvm::Twine Twine)
 {
-    writeType(Decl->getType());
+    writeType(Decl->getType(), Twine);
 }
 
-inline void OutputWriter::writeType(clang::QualType Type)
+inline void OutputWriter::writeType(clang::QualType Type, llvm::Twine Twine)
 {
-    Type.getCanonicalType().print(Out_, PrintingPolicy_);
+    Type.getCanonicalType().print(Out_, PrintingPolicy_, Twine);
 }
 
-inline void OutputWriter::writeVarDecl(const clang::VarDecl *Decl)
+inline void OutputWriter::writeVarDecl(const clang::VarDecl *Decl,
+                                       bool PrintInstantiation)
 {
-    Decl->print(Out_);
+    Decl->print(Out_, PrintInstantiation);
 }
 
-template <typename T>
-void OutputWriter::write(T Data)
+template <typename T> void OutputWriter::write(T Data)
 {
     Out_ << Data;
 }
@@ -111,7 +121,7 @@ inline void OutputWriter::flush(llvm::raw_ostream &OS)
     OS << Buffer_ << "\n";
     Buffer_.clear();
 }
-    
+
 inline clang::PrintingPolicy &OutputWriter::getPrintingPolicy()
 {
     return PrintingPolicy_;
