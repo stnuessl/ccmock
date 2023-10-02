@@ -387,9 +387,9 @@ void GMock::writeMockPointerInstance(const clang::DeclContext *Context,
 void GMock::writeMockPointerAccess(const clang::DeclContext *Context,
                                    unsigned int Indent)
 {
-    /* 
+    /*
      * Write out the appropriate mock pointer for the given context.
-     * Note that only the most top-level structures themselves need such 
+     * Note that only the most top-level structures themselves need such
      * pointers as all substructures are created as data members within them.
      *
      * Exemplary mock pointer for the translation unit itself:
@@ -402,7 +402,7 @@ void GMock::writeMockPointerAccess(const clang::DeclContext *Context,
         Context = Parent;
         Parent = Parent->getParent();
     }
-    
+
     getWriter().indent(Indent);
     getWriter().write(getConfig().ClassName);
 

@@ -300,4 +300,3 @@ void OutputWriter::writeMockName(const clang::FunctionDecl *Decl)
         break;
     }
 }
-

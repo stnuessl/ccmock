@@ -28,8 +28,14 @@ public:
     rect &operator=(const rect &other);
     rect &operator=(rect &&other) noexcept;
 
-    inline void set_x(int x) { x1 = x; }
-    inline void set_y(int y) { y1 = y; }
+    inline void set_x(int x)
+    {
+        x1 = x;
+    }
+    inline void set_y(int y)
+    {
+        y1 = y;
+    }
 
     void set_width(int width);
     void set_height(int height);
@@ -49,8 +55,8 @@ private:
 };
 
 namespace util {
-    void dispatch(const rect &rect);
-    void dispatch(int value);
+void dispatch(const rect &rect);
+void dispatch(int value);
 } /* namespace util */
 
 void run()

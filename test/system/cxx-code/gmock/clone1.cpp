@@ -26,7 +26,7 @@ TEST_F(CCMockFixture, run001)
     EXPECT_CALL(n1.n2, run(testing::Matcher(0.0))).InSequence(s1);
     EXPECT_CALL(n1.n2.n3, run(testing::Matcher(1))).InSequence(s1);
     EXPECT_CALL(n1.n2.n3, run(testing::Matcher(1.0))).InSequence(s1);
-    
+
     EXPECT_CALL(n1.n2, dispatch()).InSequence(s1);
     EXPECT_CALL(n1.n2.n3, dispatch()).InSequence(s1);
 

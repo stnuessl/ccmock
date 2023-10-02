@@ -17,10 +17,13 @@
 
 class c1 {
 public:
-    c1() = default;
+    // c1() = default;
 
     void run();
-    void set(int value) { data = value; }
+    void set(int value)
+    {
+        data = value;
+    }
 
 private:
     int data;
@@ -39,7 +42,6 @@ public:
     c2 &operator=(const c2 &other) = default;
     c2 &operator=(c2 &&other) = default;
 
-
     void run();
 };
 
@@ -54,11 +56,30 @@ extern class c2 c2;
 } /* namespace n2 */
 } /* namespace n1 */
 
+class c3 {
+public:
+    explicit c3(int i);
+
+    void run();
+    void set(int value)
+    {
+        data = value;
+    }
+
+private:
+    int data;
+};
+
+extern class c3 c3;
+
 void run()
-{   
+{
     n1::f1(0, 1);
 
     n1::n2::c1.set(n1::i1);
     n1::n2::c1.run();
     n1::n2::c2.run();
+
+    c3.set(1);
+    c3.run();
 }

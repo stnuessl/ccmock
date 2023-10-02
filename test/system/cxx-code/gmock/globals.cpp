@@ -19,6 +19,12 @@
 #include "../src/globals.cpp"
 #include "globals.inc"
 
+/*
+ * Explicitly define this global variable due to it missing a default
+ * constructor.
+ */
+class c3 c3(0);
+
 void nop(int arg1, int arg2)
 {
     (void) arg1;
@@ -31,6 +37,7 @@ TEST_F(CCMockFixture, Run001)
 
     EXPECT_CALL(c1, run());
     EXPECT_CALL(n1.c2, run());
+    EXPECT_CALL(c3, run());
 
     run();
 }

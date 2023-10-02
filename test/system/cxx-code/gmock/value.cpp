@@ -23,7 +23,7 @@ TEST_F(CCMockFixture, Run001)
     testing::Sequence s1;
 
     auto result = detail::value();
-    
+
     EXPECT_CALL(detail.value, op_equal(testing::_))
         .InSequence(s1)
         .WillOnce(testing::ReturnRef(result));
@@ -35,9 +35,7 @@ TEST_F(CCMockFixture, Run001)
         .InSequence(s1)
         .WillOnce(testing::Return(result));
 
-    EXPECT_CALL(detail.value, op_call())
-        .Times(2)
-        .InSequence(s1);
+    EXPECT_CALL(detail.value, op_call()).Times(2).InSequence(s1);
 
     run();
 }

@@ -20,7 +20,7 @@
 #include "clang/AST/DeclCXX.h"
 
 Raw::Raw(std::shared_ptr<const Config> Config, clang::PrintingPolicy Policy)
-    : OutputGenerator(std::move(Config), Policy, "Raw"), 
+    : OutputGenerator(std::move(Config), Policy, "Raw"),
       CurrentAccess_(clang::AccessSpecifier::AS_none)
 {
 }

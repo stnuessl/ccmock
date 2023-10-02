@@ -21,7 +21,6 @@ void run01();
 
 } /* namespace c1 */
 
-
 namespace c1 {
 
 void run02();

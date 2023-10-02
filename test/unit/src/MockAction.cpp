@@ -1,16 +1,16 @@
 /*
  * Copyright (C) 2023  Steffen Nuessle
- * 
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
@@ -20,10 +20,10 @@
 
 #include <MockAction.hpp>
 
-#include "output/OutputGenerator.hpp"
 #include "output/CMocka.hpp"
 #include "output/FFF.hpp"
 #include "output/GMock.hpp"
+#include "output/OutputGenerator.hpp"
 #include "output/Raw.hpp"
 
 OutputGenerator::OutputGenerator(std::shared_ptr<const Config> Config,
@@ -46,26 +46,32 @@ void OutputGenerator::HandleTranslationUnit(clang::ASTContext &Context)
 }
 
 GMock::GMock(std::shared_ptr<const Config> Config, clang::PrintingPolicy Policy)
-    : OutputGenerator(std::move(Config), Policy, "GMock"),
-      ContextMap_()
+    : OutputGenerator(std::move(Config), Policy, "GMock"), ContextMap_()
 {
 }
 
-void GMock::run() {}
+void GMock::run()
+{
+}
 
-CMocka::CMocka(std::shared_ptr<const Config> Config, clang::PrintingPolicy Policy)
+CMocka::CMocka(std::shared_ptr<const Config> Config,
+               clang::PrintingPolicy Policy)
     : OutputGenerator(std::move(Config), Policy, "CMocka")
 {
 }
 
-void CMocka::run() {}
+void CMocka::run()
+{
+}
 
 FFF::FFF(std::shared_ptr<const Config> Config, clang::PrintingPolicy Policy)
     : OutputGenerator(std::move(Config), Policy, "FFF")
 {
 }
 
-void FFF::run() {}
+void FFF::run()
+{
+}
 
 Raw::Raw(std::shared_ptr<const Config> Config, clang::PrintingPolicy Policy)
     : OutputGenerator(std::move(Config), Policy, "Raw"),
@@ -73,7 +79,9 @@ Raw::Raw(std::shared_ptr<const Config> Config, clang::PrintingPolicy Policy)
 {
 }
 
-void Raw::run() {}
+void Raw::run()
+{
+}
 
 TEST(ActionFactory, Create)
 {

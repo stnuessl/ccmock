@@ -145,7 +145,7 @@ OutputGenerator::createContextMap()
     for (const auto *Decl : getFunctionDecls()) {
         const auto *Context = clang::cast<clang::DeclContext>(Decl);
         const auto *Parent = Context->getParent();
-        
+
         Context = Context->getPrimaryContext();
 
         while (Parent) {
@@ -160,6 +160,5 @@ OutputGenerator::createContextMap()
 
     return Map;
 }
-
 
 #endif /* OUTPUTGENERATOR_HPP_ */

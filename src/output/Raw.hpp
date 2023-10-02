@@ -25,9 +25,10 @@ public:
     Raw(std::shared_ptr<const Config> Config, clang::PrintingPolicy Policy);
 
     void run() override;
+
 private:
     void visit(const clang::DeclContext *Context, unsigned int Indent = 0);
-    
+
     /* clang-format off */
     llvm::DenseMap<
         const clang::DeclContext *, 

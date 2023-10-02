@@ -21,7 +21,7 @@
 
 TEST_F(CCMockFixture, Run001)
 {
-    /* 
+    /*
      * We need our own rectangle instance which can be used as a return
      * value for the overloaded assignment operator.
      */
@@ -32,26 +32,23 @@ TEST_F(CCMockFixture, Run001)
     EXPECT_CALL(rect, constructor(0, 0, 600, 480));
     /* Default constructor is implicitly defined by "= default;" */
 
-    EXPECT_CALL(rect, op_equal(
-                testing::Matcher<const class rect &>(testing::_)))
+    EXPECT_CALL(rect,
+                op_equal(testing::Matcher<const class rect &>(testing::_)))
         .WillOnce(testing::ReturnRef(r1));
 
-    EXPECT_CALL(rect, op_equal(
-                testing::Matcher<class rect &&>(testing::_)))
+    EXPECT_CALL(rect, op_equal(testing::Matcher<class rect &&>(testing::_)))
         .WillOnce(testing::ReturnRef(r1));
 
-    EXPECT_CALL(util, 
+    EXPECT_CALL(util,
                 dispatch(testing::Matcher<const class rect &>(testing::_)))
         .Times(testing::Exactly(3));
 
-    EXPECT_CALL(rect, area())
-        .WillOnce(testing::Return(800 * 600));
+    EXPECT_CALL(rect, area()).WillOnce(testing::Return(800 * 600));
 
     EXPECT_CALL(util, dispatch(800 * 600));
 
-    /* Local variable 'r1' will also be destructed. */ 
-    EXPECT_CALL(rect, destructor())
-        .Times(testing::Exactly(4));
+    /* Local variable 'r1' will also be destructed. */
+    EXPECT_CALL(rect, destructor()).Times(testing::Exactly(4));
 
     run();
 }

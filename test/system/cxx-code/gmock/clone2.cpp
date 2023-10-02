@@ -23,13 +23,9 @@ TEST_F(CCMockFixture, Run001)
 {
     testing::Sequence s1;
 
-    EXPECT_CALL(n1.n2.c2, run())
-        .InSequence(s1);
-    EXPECT_CALL(n1.n2.c1, run())
-        .InSequence(s1);
-    EXPECT_CALL(n1.n2.c2.c1, run())
-        .InSequence(s1);
+    EXPECT_CALL(n1.n2.c2, run()).InSequence(s1);
+    EXPECT_CALL(n1.n2.c1, run()).InSequence(s1);
+    EXPECT_CALL(n1.n2.c2.c1, run()).InSequence(s1);
 
     run();
 }
-
